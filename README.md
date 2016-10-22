@@ -15,6 +15,7 @@ This small project was implemented based on the information found [here](http://
 Note that is just a small proof of concept done in 1 hour, using C# and OpenTK for rendering the output (you can easily swap it out for any other rendering system, the algoritm only gives you a list of tile IDs).
 
 A sample output, using a simple tileset with roads.
+
 ![Sample Output](/wang1.png)
 
 ============

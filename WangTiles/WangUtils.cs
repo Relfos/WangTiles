@@ -54,16 +54,29 @@ namespace Lunar.Utils
             }
         }
 
-        public static List<int> GetPossibleMatches(int tileID, WangDirection direction)
+        //private static Dictionary<ushort, List<int>> _matches = new Dictionary<ushort, List<int>>();
+
+        /// <summary>
+        /// Returns a list of all possible tiles that can connect with a specified set of neighbors
+        /// </summary>
+        /// <param name="tileID"></param>
+        /// <param name="direction"></param>
+        /// <returns></returns>
+        public static List<int> GetPossibleMatches(int left, int right, int up, int down)
         {
+            ushort matchID = (ushort)(left + (right << 4) + (up << 8) + (down << 12));
+            
             List<int> result = new List<int>();
-            for (int i=0; i<16; i++)
+            for (int newID=0; newID < 16; newID++)
             {
-                if (MatchTile(tileID, i, direction))
-                {
-                    result.Add(i);
-                }
+                if (!MatchTile(left, newID, WangDirection.East)) { continue; }
+                if (!MatchTile(right, newID, WangDirection.West)) { continue; }
+                if (!MatchTile(up, newID, WangDirection.South)) { continue; }
+                if (!MatchTile(down, newID, WangDirection.North)) { continue; }
+
+                result.Add(newID);
             }
+
             return result;
         }
 
@@ -75,6 +88,11 @@ namespace Lunar.Utils
         /// <param name="newDirection"></param>
         public static bool MatchTile(int currentID, int newID, WangDirection newDirection)
         {
+            if (currentID == -1 || newID == -1)
+            {
+                return true;
+            }
+
             bool currentSide = GetConnectionForTile(currentID, newDirection);
             bool newSide = GetConnectionForTile(newID, InvertDirection(newDirection));
             return currentSide == newSide;

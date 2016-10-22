@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using System.Drawing;
@@ -140,31 +138,26 @@ namespace WangTiles
             int up = GetMapAt(i, j - 1);
             int down = GetMapAt(i, j + 1);
 
-            int count = 0;
-            do
+            /*List<int> matches = new List<int>();
+            for (int newID=0; newID<16; newID++)
             {
-                int n = rnd.Next(16);
+                if (left != -1 && !WangUtils.MatchTile(left, newID, WangDirection.East)) { continue; }
+                if (right != -1 && !WangUtils.MatchTile(right, newID, WangDirection.West)) { continue; }
+                if (up != -1 && !WangUtils.MatchTile(up, newID, WangDirection.South)) { continue; }
+                if (down != -1 && !WangUtils.MatchTile(down, newID, WangDirection.North)) { continue; }
 
-                count++;
-                if (count > 5000)
-                {
-                    break;
-                }
+                matches.Add(newID);
+            }*/
 
-                if (right == 12)
-                {
-                    right += 0;
-                }
+            var matches = WangUtils.GetPossibleMatches(left, right, up, down);
 
-                if (left != -1 && !WangUtils.MatchTile(left, n, WangDirection.East)) { continue; }
-                if (right != -1 && !WangUtils.MatchTile(right, n, WangDirection.West)) { continue; }
-                if (up != -1 && !WangUtils.MatchTile(up, n, WangDirection.South)) { continue; }
-                if (down != -1 && !WangUtils.MatchTile(down, n, WangDirection.North)) { continue; }
+            if (matches.Count<=0)
+            {
+                return;
+            }
 
-                SetMapAt(i, j, n);
-                break;
-
-            } while (true);
+            int n = matches[rnd.Next(matches.Count)];
+            SetMapAt(i, j, n);
         }
 
         #endregion
@@ -195,6 +188,7 @@ namespace WangTiles
                     {
                         continue;
                     }
+
 
                     TryPlacingRandomTile(i, j);
                 }

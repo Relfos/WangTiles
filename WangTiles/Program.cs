@@ -5,6 +5,7 @@ using OpenTK.Graphics.OpenGL;
 using OpenTK.Input;
 using System.Drawing;
 using Lunar.Utils;
+using System.Net;
 
 namespace WangTiles
 {
@@ -94,6 +95,7 @@ namespace WangTiles
         private static int mapHeight = 10;
         private static bool mapWrapX = false;
         private static bool mapWrapY = false;
+        private static bool mapInvert = false;
         private static int[] map = new int[mapWidth * mapHeight];
 
         private static int GetMapAt(int x, int y)
@@ -176,11 +178,31 @@ namespace WangTiles
             }
         }
 
+        private static void DownloadTileset(string name)
+        {
+            using (var client = new WebClient())
+            {
+                Bitmap target = new Bitmap(512, 32);
+                for (int i = 0; i < 16; i++)
+                {
+                    var url = "http://s358455341.websitehome.co.uk/stagecast/art/edge/" + name + "/" + i + ".gif";
+                    var tempName = "temp" + i + ".gif";
+                    client.DownloadFile(url, tempName);
+                    Bitmap temp = new Bitmap(tempName);
+                    Graphics g = Graphics.FromImage(target);
+                    g.DrawImage(temp, i * tileSize, 0);
+                }
+                target.Save("tileset.png");
+            }
+        }
+
         public static void Main(string[] args)
         {
+            //DownloadTileset("walkway");
+
             List<Bitmap> tilesets = new List<Bitmap>();
             // load tilesets
-            for (int i=1; i<=3; i++)
+            for (int i=1; i<=9; i++)
             {
                 var tileset = new Bitmap("../data/tileset"+i+".png");
                 tilesets.Add(tileset);
@@ -229,6 +251,25 @@ namespace WangTiles
                 }
             }
 
+            // final, optional pass, invert bits 
+            if (mapInvert)
+            {
+                for (int j = 0; j < mapHeight; j++)
+                {
+                    for (int i = 0; i < mapWidth; i++)
+                    {
+                        int current = GetMapAt(i, j);
+                        if (current < 0) // if tile is not set, skip
+                        {
+                            continue;
+                        }
+
+                        SetMapAt(i, j, 15 - current);
+                    }
+                }
+            }
+
+
             // now render the map to a pixel array
             RedrawWithTileset(tilesets[0]);
 
@@ -275,6 +316,36 @@ namespace WangTiles
                     if (game.Keyboard[Key.Number3])
                     {
                         RedrawWithTileset(tilesets[2]);
+                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                    }
+                    if (game.Keyboard[Key.Number4])
+                    {
+                        RedrawWithTileset(tilesets[3]);
+                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                    }
+                    if (game.Keyboard[Key.Number5])
+                    {
+                        RedrawWithTileset(tilesets[4]);
+                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                    }
+                    if (game.Keyboard[Key.Number6])
+                    {
+                        RedrawWithTileset(tilesets[5]);
+                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                    }
+                    if (game.Keyboard[Key.Number7])
+                    {
+                        RedrawWithTileset(tilesets[6]);
+                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                    }
+                    if (game.Keyboard[Key.Number8])
+                    {
+                        RedrawWithTileset(tilesets[7]);
+                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                    }
+                    if (game.Keyboard[Key.Number9])
+                    {
+                        RedrawWithTileset(tilesets[8]);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                 };

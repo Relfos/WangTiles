@@ -64,13 +64,12 @@ namespace WangTiles
         #endregion
 
         #region TILESET
-        private static Bitmap tileset;
         private const int tileSize = 32;
 
         /// <summary>
         /// Draws a tile in the texture buffer at specified position
         /// </summary>
-        private static void DrawTile(int targetX, int targetY, int tileID)
+        private static void DrawTile(int targetX, int targetY, int tileID, Bitmap tileset)
         {
             for (int y = 0; y < tileSize; y++)
             {
@@ -164,10 +163,29 @@ namespace WangTiles
 
         private static Random rnd = new Random(3424);
 
+        private static void RedrawWithTileset(Bitmap tileset)
+        {
+            for (int j = 0; j < mapHeight; j++)
+            {
+                for (int i = 0; i < mapWidth; i++)
+                {
+                    int tileID = map[i + j * mapWidth];
+                    if (tileID < 0) { continue; }
+                    DrawTile(i * tileSize, j * tileSize, tileID, tileset);
+                }
+            }
+        }
+
         public static void Main(string[] args)
         {
-            // load a tileset
-            tileset = new Bitmap("../data/tileset.png");
+            List<Bitmap> tilesets = new List<Bitmap>();
+            // load tilesets
+            for (int i=1; i<=3; i++)
+            {
+                var tileset = new Bitmap("../data/tileset"+i+".png");
+                tilesets.Add(tileset);
+            }
+            
 
             // first pass clears all tiles
             for (int j = 0; j < mapHeight; j++)
@@ -212,15 +230,7 @@ namespace WangTiles
             }
 
             // now render the map to a pixel array
-            for (int j=0; j<mapHeight; j++)
-            {
-                for (int i = 0; i < mapWidth; i++)
-                {
-                    int tileID = map[i + j * mapWidth];
-                    if (tileID < 0) { continue; }
-                    DrawTile(i * tileSize, j * tileSize, tileID);
-                }
-            }
+            RedrawWithTileset(tilesets[0]);
 
 
             int bufferTexID = 0;
@@ -250,6 +260,22 @@ namespace WangTiles
                     {
                         game.Exit();
                         Environment.Exit(0);
+                    }
+
+                    if (game.Keyboard[Key.Number1])
+                    {
+                        RedrawWithTileset(tilesets[0]);
+                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                    }
+                    if (game.Keyboard[Key.Number2])
+                    {
+                        RedrawWithTileset(tilesets[1]);
+                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                    }
+                    if (game.Keyboard[Key.Number3])
+                    {
+                        RedrawWithTileset(tilesets[2]);
+                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                 };
 

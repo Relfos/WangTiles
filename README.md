@@ -14,6 +14,9 @@ Wang Tiles are a very simple but useful concept that can be used to generate an 
 This small project was implemented based on the information found [here](http://s358455341.websitehome.co.uk/stagecast/wang/intro.html)
 Note that is just a small proof of concept done in 1 hour, using C# and OpenTK for rendering the output (you can easily swap it out for any other rendering system, the algoritm only gives you a list of tile IDs).
 
+
+When running the sample, you can change the tileset using the number keys.
+
 A sample output, using a simple tileset with roads.
 
 ![Sample Output](/wang1.png)

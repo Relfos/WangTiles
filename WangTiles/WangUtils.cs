@@ -64,7 +64,7 @@ namespace Lunar.Utils
         /// <returns></returns>
         public static List<int> GetPossibleMatches(int left, int right, int up, int down)
         {
-            ushort matchID = (ushort)(left + (right << 4) + (up << 8) + (down << 12));
+            //ushort matchID = (ushort)(left + (right << 4) + (up << 8) + (down << 12));
             
             List<int> result = new List<int>();
             for (int newID=0; newID < 16; newID++)
@@ -97,5 +97,17 @@ namespace Lunar.Utils
             bool newSide = GetConnectionForTile(newID, InvertDirection(newDirection));
             return currentSide == newSide;
         }
+
+        public static int AddConnection(int tileID, WangDirection direction)
+        {
+            int mask = 1 << ((int)direction);
+            return tileID | mask; 
+        }
+    }
+
+    public class WangArea
+    {
+        public int ID;
+        public List<WangArea> children;
     }
 }

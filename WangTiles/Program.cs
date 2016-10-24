@@ -99,8 +99,10 @@ namespace WangTiles
         #region MAP
         private struct MapTile
         {
+            public int x;
+            public int y;
             public int tileID;
-            public int areaID;
+            public WangArea areaID;
         }
 
         private static int mapWidth = 16;
@@ -129,7 +131,32 @@ namespace WangTiles
             }
         }
 
-        private static int GetMapAt(int x, int y)
+        private static List<MapTile> FindTilesInAreaEdges(int areaID)
+        {
+            List<MapTile> result = new List<MapTile>();
+            for (int j = 0; j < mapHeight; j++)
+            {
+                for (int i = 0; i < mapWidth; i++)
+                {
+                    int ofs = GetMapOffset(i, j);
+                    if (map[ofs].areaID != areaID) // check if this tile already have an area assigned
+                    {
+                        continue;
+                    }
+
+                    if ((i > 0 && GetMapAt(i - 1, j).areaID != areaID) || (j > 0 && GetMapAt(i, j - 1).areaID != areaID)
+                        || (i < mapWidth-1 && GetMapAt(i + 1, j).areaID != areaID) || (j < mapHeight -1 && GetMapAt(i, j - 1).areaID != areaID))
+                    {
+                        result.Add(map[ofs]);
+                    }
+
+                }
+            }
+
+            return result;
+        }
+
+        private static MapTile GetMapAt(int x, int y)
         {
             if (mapWrapX && x<0)
             {
@@ -153,9 +180,12 @@ namespace WangTiles
 
             if (x<0 || y<0 || x>=mapWidth || y>=mapHeight)
             {
-                return 0;
+                var result = new MapTile();
+                result.tileID = 0;
+                result.areaID = -1;
+                return result;
             }
-            return map[GetMapOffset(x, y)].tileID;
+            return map[GetMapOffset(x, y)];
         }
 
         private static int GetMapOffset(int x, int y)
@@ -170,10 +200,10 @@ namespace WangTiles
 
         private static void TryPlacingRandomTile(int i, int j)
         {
-            int left = GetMapAt(i - 1, j);
-            int right = GetMapAt(i + 1, j);
-            int up = GetMapAt(i, j - 1);
-            int down = GetMapAt(i, j + 1);
+            int left = GetMapAt(i - 1, j).tileID;
+            int right = GetMapAt(i + 1, j).tileID;
+            int up = GetMapAt(i, j - 1).tileID;
+            int down = GetMapAt(i, j + 1).tileID;
 
             /*List<int> matches = new List<int>();
             for (int newID=0; newID<16; newID++)
@@ -233,7 +263,7 @@ namespace WangTiles
             }
         }
 
-        private static void FloodFillArea(int x, int y, int areaID)
+        private static void FloodFillArea(int x, int y, WangArea area)
         {
             int ofs = GetMapOffset(x, y);
             map[ofs].areaID = areaID;
@@ -291,6 +321,8 @@ namespace WangTiles
                     int ofs = GetMapOffset(i, j);
                     map[ofs].areaID = -1;
                     map[ofs].tileID = -1;
+                    map[ofs].x = i;
+                    map[ofs].y = j;
                 }
             }
             
@@ -313,7 +345,7 @@ namespace WangTiles
             {
                 for (int i = 0; i < mapWidth; i++)
                 {
-                    int current = GetMapAt(i, j);
+                    int current = GetMapAt(i, j).tileID;
                     if (current >= 0) // if tile already set, skip
                     {
                         continue;
@@ -332,7 +364,7 @@ namespace WangTiles
                 {
                     for (int i = 0; i < mapWidth; i++)
                     {
-                        int current = GetMapAt(i, j);
+                        int current = GetMapAt(i, j).tileID;
                         if (current < 0) // if tile is not set, skip
                         {
                             continue;
@@ -343,15 +375,14 @@ namespace WangTiles
                 }
             }
 
-            // detect isolate areas and connect them
-            // after this pass, all tiles will be connected 
-            int lastArea = -1;
+            // detect isolate areas
+            List<WangArea> areas = new List<WangArea>(); 
             for (int j = 0; j < mapHeight; j++)
             {
                 for (int i = 0; i < mapWidth; i++)
                 {
                     int ofs = GetMapOffset(i, j);
-                    if (map[ofs].areaID != -1) // check if this tile already have an area assigned
+                    if (map[ofs].areaID != null) // check if this tile already have an area assigned
                     {
                         continue; 
                     }
@@ -361,9 +392,26 @@ namespace WangTiles
                         continue;
                     }
 
-                    lastArea++; // generate a new area ID
-                    FloodFillArea(i, j, lastArea);
+                    var area = new WangArea();
+                    areas.Add(area);
+                    FloodFillArea(i, j, area);
                 }
+            }
+
+            // after this pass, all tiles will be connected 
+            HashSet<WangArea> areaSet = new HashSet<WangArea>();
+            while (areaSet.Count<areas.Count)
+            {
+                var tiles = FindTilesInAreaEdges(k);
+                if (tiles.Count<=0)
+                {
+                    continue;
+                }
+
+                var tile = tiles[rnd.Next(tiles.Count)];
+                int ofs = GetMapOffset(tile.x, tile.y);
+                map[ofs].tileID = WangUtils.AddConnection(map[ofs].tileID, WangDirection.South);
+                //map[ofs].tileID = 0;
             }
 
             // now render the map to a pixel array

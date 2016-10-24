@@ -70,7 +70,7 @@ namespace WangTiles
         /// <summary>
         /// Draws a tile in the texture buffer at specified position
         /// </summary>
-        private static void DrawTile(int targetX, int targetY, int tileID, Bitmap tileset)
+        private static void DrawTile(int targetX, int targetY, int tileID, Bitmap tileset, Color borderColor)
         {
             for (int y = 0; y < tileSize; y++)
             {
@@ -80,6 +80,12 @@ namespace WangTiles
                     if (y + targetY >= bufferHeight || y+targetY<0) { continue; }
                     int destOfs = ((x + targetX) + bufferWidth * (y + targetY)) * 4;
                     var c = tileset.GetPixel((tileID * tileSize) + x, y);
+
+                    if (borderColor.A>0 && ( x==0 || y== 0 || x == tileSize - 1 || y == tileSize - 1))
+                    {
+                        c = borderColor;
+                    }
+
                     buffer[destOfs + 0] = c.R;
                     buffer[destOfs + 1] = c.G;
                     buffer[destOfs + 2] = c.B;
@@ -91,12 +97,37 @@ namespace WangTiles
         #endregion
 
         #region MAP
+        private struct MapTile
+        {
+            public int tileID;
+            public int areaID;
+        }
+
         private static int mapWidth = 16;
         private static int mapHeight = 10;
         private static bool mapWrapX = false;
         private static bool mapWrapY = false;
         private static bool mapInvert = false;
-        private static int[] map = new int[mapWidth * mapHeight];
+        private static MapTile[] map = new MapTile[mapWidth * mapHeight];
+
+        private static Color GetAreaColor(int areaID)
+        {
+            switch (areaID)
+            {
+                case 0: return Color.Red;
+                case 1: return Color.Green;
+                case 2: return Color.Blue;
+                case 3: return Color.Yellow;
+                case 4: return Color.Magenta;
+                case 5: return Color.Cyan;
+                case 6: return Color.Orange;
+                case 7: return Color.Purple;
+                case 8: return Color.Gray;
+                case 9: return Color.Beige;
+                case 10: return Color.Chocolate;
+                default: return Color.FromArgb(0);
+            }
+        }
 
         private static int GetMapAt(int x, int y)
         {
@@ -124,12 +155,17 @@ namespace WangTiles
             {
                 return 0;
             }
-            return map[x + y * mapWidth];
+            return map[GetMapOffset(x, y)].tileID;
+        }
+
+        private static int GetMapOffset(int x, int y)
+        {
+            return x + y * mapWidth;
         }
 
         private static void SetMapAt(int x, int y, int val)
         {
-            map[x + y * mapWidth] = val;
+            map[GetMapOffset(x,y)].tileID = val;
         }
 
         private static void TryPlacingRandomTile(int i, int j)
@@ -171,9 +207,10 @@ namespace WangTiles
             {
                 for (int i = 0; i < mapWidth; i++)
                 {
-                    int tileID = map[i + j * mapWidth];
+                    int ofs = GetMapOffset(i, j);
+                    int tileID = map[ofs].tileID;
                     if (tileID < 0) { continue; }
-                    DrawTile(i * tileSize, j * tileSize, tileID, tileset);
+                    DrawTile(i * tileSize, j * tileSize, tileID, tileset, GetAreaColor(map[ofs].areaID));
                 }
             }
         }
@@ -196,6 +233,44 @@ namespace WangTiles
             }
         }
 
+        private static void FloodFillArea(int x, int y, int areaID)
+        {
+            int ofs = GetMapOffset(x, y);
+            map[ofs].areaID = areaID;
+
+            // flood all adjacent tiles if possible
+            FloodFillArea(x - 1, y, areaID, WangDirection.East);
+            FloodFillArea(x + 1, y, areaID, WangDirection.West);
+            FloodFillArea(x, y - 1, areaID, WangDirection.South);
+            FloodFillArea(x, y + 1, areaID, WangDirection.North);
+        }
+
+        private static void FloodFillArea(int x, int y, int areaID, WangDirection direction)
+        {
+            if (x<0 || y<0 || x>=mapWidth || y>=mapHeight) // if out of bounds, return
+            {
+                return;
+            }
+
+            int ofs = GetMapOffset(x, y);
+            if (map[ofs].areaID != -1) // if already filled then stop
+            {
+                return;
+            }
+
+            if (map[ofs].tileID == 0) // empty tiles should not be filled
+            {
+                return;
+            }
+
+            if (WangUtils.GetConnectionForTile(map[ofs].tileID, direction) == false)
+            {
+                return;
+            }
+
+            FloodFillArea(x, y, areaID);
+        }
+
         public static void Main(string[] args)
         {
             //DownloadTileset("walkway");
@@ -208,16 +283,16 @@ namespace WangTiles
                 tilesets.Add(tileset);
             }
             
-
             // first pass clears all tiles
             for (int j = 0; j < mapHeight; j++)
             {
                 for (int i = 0; i < mapWidth; i++)
                 {
-                    SetMapAt(i, j, -1);
+                    int ofs = GetMapOffset(i, j);
+                    map[ofs].areaID = -1;
+                    map[ofs].tileID = -1;
                 }
             }
-
             
             // second pass places random tiles in a checkerboard pattern
             for (int j = 0; j < mapHeight; j++)
@@ -228,7 +303,6 @@ namespace WangTiles
                     {
                         continue;
                     }
-
 
                     TryPlacingRandomTile(i, j);
                 }
@@ -251,7 +325,7 @@ namespace WangTiles
                 }
             }
 
-            // final, optional pass, invert bits 
+            // optional pass, invert bits 
             if (mapInvert)
             {
                 for (int j = 0; j < mapHeight; j++)
@@ -269,9 +343,31 @@ namespace WangTiles
                 }
             }
 
+            // detect isolate areas and connect them
+            // after this pass, all tiles will be connected 
+            int lastArea = -1;
+            for (int j = 0; j < mapHeight; j++)
+            {
+                for (int i = 0; i < mapWidth; i++)
+                {
+                    int ofs = GetMapOffset(i, j);
+                    if (map[ofs].areaID != -1) // check if this tile already have an area assigned
+                    {
+                        continue; 
+                    }
+
+                    if (map[ofs].tileID == 0) // empty tiles should not be filled
+                    {
+                        continue;
+                    }
+
+                    lastArea++; // generate a new area ID
+                    FloodFillArea(i, j, lastArea);
+                }
+            }
 
             // now render the map to a pixel array
-            RedrawWithTileset(tilesets[0]);
+            RedrawWithTileset(tilesets[1]);
 
 
             int bufferTexID = 0;

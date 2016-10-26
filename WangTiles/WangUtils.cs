@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Drawing;
 
 //http://s358455341.websitehome.co.uk/stagecast/wang/intro.html
 namespace Lunar.Utils
@@ -108,6 +109,31 @@ namespace Lunar.Utils
     public class WangArea
     {
         public int ID;
-        public List<WangArea> children;
+        public List<WangArea> children = new List<WangArea>();
+
+        public override string ToString()
+        {
+            return "Area "+ID.ToString()+ " ("+ GetColor().ToString() +")";
+        }
+
+        public Color GetColor()
+        {
+            switch (ID)
+            {
+                case 0: return Color.Red;
+                case 1: return Color.Green;
+                case 2: return Color.Blue;
+                case 3: return Color.Yellow;
+                case 4: return Color.Magenta;
+                case 5: return Color.Cyan;
+                case 6: return Color.Orange;
+                case 7: return Color.Purple;
+                case 8: return Color.Gray;
+                case 9: return Color.Beige;
+                case 10: return Color.Chocolate;
+                default: return Color.Black;
+            }
+        }
+
     }
 }

@@ -146,13 +146,27 @@ namespace Lunar.Utils
         }    
     }
 
-    public struct MapTile
+    public struct WangTile
     {
         public int tileID;
         public WangArea areaID;
     }
 
-    public struct MapEdgeTile
+    public struct WangMapExit
+    {
+        public int x;
+        public int y;
+        public WangDirection direction;
+
+        public WangMapExit(int x, int y, WangDirection dir)
+        {
+            this.x = x;
+            this.y = y;
+            this.direction = dir;
+        }
+    }
+
+    public struct WangEdgeTile
     {
         public int x1;
         public int y1;
@@ -165,20 +179,22 @@ namespace Lunar.Utils
 
     public class WangMap
     {
-        private int mapWidth = 16;
-        public int Width { get { return mapWidth; } }
+        private int _width = 16;
+        public int Width { get { return _width; } }
 
-        private int mapHeight = 10;
-        public int Height { get { return mapHeight; } }
+        private int _height = 10;
+        public int Height { get { return _height; } }
 
-        private bool mapWrapX = false;
-        private bool mapWrapY = false;
+        private bool _wrapX = false;
+        private bool _wrapY = false;
 
-        private MapTile[] tiles;
+        private WangTile[] tiles;
+
+        private List<WangMapExit> exits = new List<WangMapExit>();
 
         private Random rnd;
 
-        public WangMap(int width, int height, int seed = 0)
+        public WangMap(int width, int height, int seed = 0, bool wrapX = false, bool wrapY = false)
         {
             if (seed == 0)
             {
@@ -187,14 +203,17 @@ namespace Lunar.Utils
 
             this.rnd = new Random(seed);
 
-            this.mapWidth = width;
-            this.mapHeight = height;
-            tiles = new MapTile[mapWidth * mapHeight];
+            this._wrapX = wrapX;
+            this._wrapY = wrapY;
+
+            this._width = width;
+            this._height = height;
+            tiles = new WangTile[_width * _height];
 
             // first pass clears all tiles
-            for (int j = 0; j < mapHeight; j++)
+            for (int j = 0; j < _height; j++)
             {
-                for (int i = 0; i < mapWidth; i++)
+                for (int i = 0; i < _width; i++)
                 {
                     int ofs = GetTileOffset(i, j);
                     tiles[ofs].areaID = null;
@@ -203,14 +222,34 @@ namespace Lunar.Utils
             }
         }
 
-        private static void AddEdgeTile(Dictionary<WangArea, List<MapEdgeTile>> result, WangArea otherArea, int x1, int y1, int x2, int y2, WangDirection exitDir)
+        public bool AddExit(int x, int y)
+        {
+            WangDirection dir;
+
+            if (y < 0) { dir = WangDirection.South; }
+            else
+            if (y >= Height) { dir = WangDirection.North; }
+            else
+            if (x < 0) { dir = WangDirection.East; }
+            else
+            if (x >= Width) { dir = WangDirection.West; }
+            else
+            {
+                return false;
+            }
+
+            exits.Add(new WangMapExit(x, y, dir));
+            return true;
+        }
+
+        private static void AddEdgeTile(Dictionary<WangArea, List<WangEdgeTile>> result, WangArea otherArea, int x1, int y1, int x2, int y2, WangDirection exitDir)
         {
             if (!result.ContainsKey(otherArea))
             {
-                result[otherArea] = new List<MapEdgeTile>();
+                result[otherArea] = new List<WangEdgeTile>();
             }
 
-            MapEdgeTile et = new MapEdgeTile();
+            WangEdgeTile et = new WangEdgeTile();
             et.x1 = x1;
             et.y1 = y1;
             et.x2 = x2;
@@ -219,9 +258,9 @@ namespace Lunar.Utils
             result[otherArea].Add(et);
         }
 
-        private Dictionary<WangArea, List<MapEdgeTile>> FindTilesInAreaEdges(WangArea curArea)
+        private Dictionary<WangArea, List<WangEdgeTile>> FindTilesInAreaEdges(WangArea curArea)
         {
-            Dictionary<WangArea, List<MapEdgeTile>> result = new Dictionary<WangArea, List<MapEdgeTile>>();
+            Dictionary<WangArea, List<WangEdgeTile>> result = new Dictionary<WangArea, List<WangEdgeTile>>();
             for (int j = 0; j < this.Height; j++)
             {
                 for (int i = 0; i < this.Width; i++)
@@ -245,13 +284,13 @@ namespace Lunar.Utils
                     }
 
                     otherArea = GetTileAt(i + 1, j).areaID;
-                    if (i < mapWidth - 1 && otherArea != curArea && otherArea != null)
+                    if (i < _width - 1 && otherArea != curArea && otherArea != null)
                     {
                         AddEdgeTile(result, otherArea, i, j, i + 1, j, WangDirection.East);
                     }
 
                     otherArea = GetTileAt(i, j + 1).areaID;
-                    if (j < mapHeight - 1 && otherArea != curArea && otherArea != null)
+                    if (j < _height - 1 && otherArea != curArea && otherArea != null)
                     {
                         AddEdgeTile(result, otherArea, i, j, i, j + 1, WangDirection.South);
                     }
@@ -261,31 +300,45 @@ namespace Lunar.Utils
             return result;
         }
 
-        public MapTile GetTileAt(int x, int y)
+        public WangTile GetTileAt(int x, int y)
         {
-            if (mapWrapX && x < 0)
+            if (x<0 || y<0 || x>=Width || y>=Height)
             {
-                x += mapWidth;
+                foreach (var exit in exits)
+                {
+                    if (exit.x == x && exit.y == y)
+                    {
+                        var result = new WangTile();
+                        result.tileID = WangUtils.AddConnection(0, exit.direction);
+                        result.areaID = null;
+                        return result;
+                    }
+                }
             }
 
-            if (mapWrapX && x >= mapWidth)
+            if (_wrapX && x < 0)
             {
-                x -= mapWidth;
+                x += _width;
             }
 
-            if (mapWrapY && y < 0)
+            if (_wrapX && x >= _width)
             {
-                y += mapHeight;
+                x -= _width;
             }
 
-            if (mapWrapY && y >= mapHeight)
+            if (_wrapY && y < 0)
             {
-                y -= mapHeight;
+                y += _height;
             }
 
-            if (x < 0 || y < 0 || x >= mapWidth || y >= mapHeight)
+            if (_wrapY && y >= _height)
             {
-                var result = new MapTile();
+                y -= _height;
+            }
+
+            if (x < 0 || y < 0 || x >= _width || y >= _height)
+            {
+                var result = new WangTile();
                 result.tileID = 0;
                 result.areaID = null;
                 return result;
@@ -295,7 +348,7 @@ namespace Lunar.Utils
 
         public int GetTileOffset(int x, int y)
         {
-            return x + y * mapWidth;
+            return x + y * _width;
         }
 
         public void SetTileAt(int x, int y, int val)
@@ -317,7 +370,7 @@ namespace Lunar.Utils
 
         private void FloodFillArea(int x, int y, WangArea areaID, WangDirection direction)
         {
-            if (x < 0 || y < 0 || x >= mapWidth || y >= mapHeight) // if out of bounds, return
+            if (x < 0 || y < 0 || x >= _width || y >= _height) // if out of bounds, return
             {
                 return;
             }
@@ -383,9 +436,9 @@ namespace Lunar.Utils
         public void Generate()
         {
             // first pass places random tiles in a checkerboard pattern
-            for (int j = 0; j < mapHeight; j++)
+            for (int j = 0; j < _height; j++)
             {
-                for (int i = 0; i < mapWidth; i++)
+                for (int i = 0; i < _width; i++)
                 {
                     if (i % 2 == j % 2)
                     {
@@ -397,9 +450,9 @@ namespace Lunar.Utils
             }
 
             // second pass places random tiles in the mising holes, checking for matching edges
-            for (int j = 0; j < mapHeight; j++)
+            for (int j = 0; j < _height; j++)
             {
-                for (int i = 0; i < mapWidth; i++)
+                for (int i = 0; i < _width; i++)
                 {
                     int current = GetTileAt(i, j).tileID;
                     if (current >= 0) // if tile already set, skip
@@ -421,7 +474,7 @@ namespace Lunar.Utils
             List<WangArea> areas = new List<WangArea>();
             for (int j = 0; j < Height; j++)
             {
-                for (int i = 0; i < mapWidth; i++)
+                for (int i = 0; i < _width; i++)
                 {
                     int ofs = GetTileOffset(i, j);
                     if (tiles[ofs].areaID != null) // check if this tile already have an area assigned
@@ -452,9 +505,9 @@ namespace Lunar.Utils
 
         public void Invert()
         {
-            for (int j = 0; j < mapHeight; j++)
+            for (int j = 0; j < _height; j++)
             {
-                for (int i = 0; i < mapWidth; i++)
+                for (int i = 0; i < _width; i++)
                 {
                     int current = GetTileAt(i, j).tileID;
                     if (current < 0) // if tile is not set, skip

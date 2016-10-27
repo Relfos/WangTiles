@@ -143,6 +143,8 @@ namespace WangTiles
 
             var map = new WangMap(16, 10, 3424);
 
+            map.AddExit(1, -1);
+
             map.Generate();
 
             map.FixConnectivity();

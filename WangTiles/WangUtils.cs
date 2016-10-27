@@ -15,7 +15,17 @@ namespace Lunar.Utils
 
     public static class WangUtils
     {
-        
+        public static Color GetAreaColor(WangArea area)
+        {
+            if (area == null)
+            {
+                return Color.FromArgb(0);
+            }
+
+            return area.GetColor();
+        }
+
+
 
         /// <summary>
         /// Returns bools for all 4 directions, if true, the tile has a connection in that direction
@@ -156,19 +166,42 @@ namespace Lunar.Utils
     public class WangMap
     {
         private int mapWidth = 16;
+        public int Width { get { return mapWidth; } }
+
         private int mapHeight = 10;
+        public int Height { get { return mapHeight; } }
+
         private bool mapWrapX = false;
         private bool mapWrapY = false;
-        private bool mapInvert = false;
-        private MapTile[] map;
 
-        public WangMap(int width, int height)
+        private MapTile[] tiles;
+
+        private Random rnd;
+
+        public WangMap(int width, int height, int seed = 0)
         {
+            if (seed == 0)
+            {
+                seed = Environment.TickCount;
+            }
+
+            this.rnd = new Random(seed);
+
             this.mapWidth = width;
             this.mapHeight = height;
-            map = new MapTile[mapWidth * mapHeight];
-        }
+            tiles = new MapTile[mapWidth * mapHeight];
 
+            // first pass clears all tiles
+            for (int j = 0; j < mapHeight; j++)
+            {
+                for (int i = 0; i < mapWidth; i++)
+                {
+                    int ofs = GetTileOffset(i, j);
+                    tiles[ofs].areaID = null;
+                    tiles[ofs].tileID = -1;
+                }
+            }
+        }
 
         private static void AddEdgeTile(Dictionary<WangArea, List<MapEdgeTile>> result, WangArea otherArea, int x1, int y1, int x2, int y2, WangDirection exitDir)
         {
@@ -186,38 +219,38 @@ namespace Lunar.Utils
             result[otherArea].Add(et);
         }
 
-        private static Dictionary<WangArea, List<MapEdgeTile>> FindTilesInAreaEdges(WangArea curArea)
+        private Dictionary<WangArea, List<MapEdgeTile>> FindTilesInAreaEdges(WangArea curArea)
         {
             Dictionary<WangArea, List<MapEdgeTile>> result = new Dictionary<WangArea, List<MapEdgeTile>>();
-            for (int j = 0; j < mapHeight; j++)
+            for (int j = 0; j < this.Height; j++)
             {
-                for (int i = 0; i < mapWidth; i++)
+                for (int i = 0; i < this.Width; i++)
                 {
-                    int ofs = GetMapOffset(i, j);
-                    if (map[ofs].areaID != curArea) // check if this tile belongs to the area we are testing
+                    int ofs = GetTileOffset(i, j);
+                    if (tiles[ofs].areaID != curArea) // check if this tile belongs to the area we are testing
                     {
                         continue;
                     }
 
-                    var otherArea = GetMapAt(i - 1, j).areaID;
+                    var otherArea = GetTileAt(i - 1, j).areaID;
                     if (i > 0 && otherArea != curArea && otherArea != null)
                     {
                         AddEdgeTile(result, otherArea, i, j, i - 1, j, WangDirection.West);
                     }
 
-                    otherArea = GetMapAt(i, j - 1).areaID;
+                    otherArea = GetTileAt(i, j - 1).areaID;
                     if (j > 0 && otherArea != curArea && otherArea != null)
                     {
                         AddEdgeTile(result, otherArea, i, j, i, j - 1, WangDirection.North);
                     }
 
-                    otherArea = GetMapAt(i + 1, j).areaID;
+                    otherArea = GetTileAt(i + 1, j).areaID;
                     if (i < mapWidth - 1 && otherArea != curArea && otherArea != null)
                     {
                         AddEdgeTile(result, otherArea, i, j, i + 1, j, WangDirection.East);
                     }
 
-                    otherArea = GetMapAt(i, j + 1).areaID;
+                    otherArea = GetTileAt(i, j + 1).areaID;
                     if (j < mapHeight - 1 && otherArea != curArea && otherArea != null)
                     {
                         AddEdgeTile(result, otherArea, i, j, i, j + 1, WangDirection.South);
@@ -228,7 +261,7 @@ namespace Lunar.Utils
             return result;
         }
 
-        private static MapTile GetMapAt(int x, int y)
+        public MapTile GetTileAt(int x, int y)
         {
             if (mapWrapX && x < 0)
             {
@@ -257,25 +290,189 @@ namespace Lunar.Utils
                 result.areaID = null;
                 return result;
             }
-            return map[GetMapOffset(x, y)];
+            return tiles[GetTileOffset(x, y)];
         }
 
-        private static int GetMapOffset(int x, int y)
+        public int GetTileOffset(int x, int y)
         {
             return x + y * mapWidth;
         }
 
-        private static void SetMapAt(int x, int y, int val)
+        public void SetTileAt(int x, int y, int val)
         {
-            map[GetMapOffset(x, y)].tileID = val;
+            tiles[GetTileOffset(x, y)].tileID = val;
         }
 
-        private static void TryPlacingRandomTile(int i, int j)
+        private void FloodFillArea(int x, int y, WangArea areaID)
         {
-            int left = GetMapAt(i - 1, j).tileID;
-            int right = GetMapAt(i + 1, j).tileID;
-            int up = GetMapAt(i, j - 1).tileID;
-            int down = GetMapAt(i, j + 1).tileID;
+            int ofs = GetTileOffset(x, y);
+            tiles[ofs].areaID = areaID;
+
+            // flood all adjacent tiles if possible
+            FloodFillArea(x - 1, y, areaID, WangDirection.East);
+            FloodFillArea(x + 1, y, areaID, WangDirection.West);
+            FloodFillArea(x, y - 1, areaID, WangDirection.South);
+            FloodFillArea(x, y + 1, areaID, WangDirection.North);
+        }
+
+        private void FloodFillArea(int x, int y, WangArea areaID, WangDirection direction)
+        {
+            if (x < 0 || y < 0 || x >= mapWidth || y >= mapHeight) // if out of bounds, return
+            {
+                return;
+            }
+
+            int ofs = GetTileOffset(x, y);
+            if (tiles[ofs].areaID != null) // if already filled then stop
+            {
+                return;
+            }
+
+            if (tiles[ofs].tileID == 0) // empty tiles should not be filled
+            {
+                return;
+            }
+
+            if (WangUtils.GetConnectionForTile(tiles[ofs].tileID, direction) == false)
+            {
+                return;
+            }
+
+            FloodFillArea(x, y, areaID);
+        }
+
+        private bool JoinArea(WangArea parent, WangArea area, HashSet<WangArea> areaSet)
+        {
+            if (areaSet.Contains(area))
+            {
+                return false;
+            }
+
+            areaSet.Add(area);
+
+            //Console.WriteLine("Testing area: " + GetAreaColor(area));
+
+            var result = FindTilesInAreaEdges(area);
+            if (result.Count <= 0)
+            {
+                return true;
+            }
+
+            foreach (var temp in result)
+            {
+                if (JoinArea(area, temp.Key, areaSet))
+                {
+                    area.children.Add(temp.Key);
+
+                    var tiles = temp.Value;
+                    var tile = tiles[rnd.Next(tiles.Count)];
+
+                    //Console.WriteLine("Joined " + GetAreaColor(area) + " to " + GetAreaColor(temp.Key));
+
+                    int ofs = GetTileOffset(tile.x1, tile.y1);
+                    this.tiles[ofs].tileID = WangUtils.AddConnection(this.tiles[ofs].tileID, tile.exit);
+
+                    ofs = GetTileOffset(tile.x2, tile.y2);
+                    this.tiles[ofs].tileID = WangUtils.AddConnection(this.tiles[ofs].tileID, WangUtils.InvertDirection(tile.exit));
+                }
+            }
+
+            return true;
+        }
+
+        public void Generate()
+        {
+            // first pass places random tiles in a checkerboard pattern
+            for (int j = 0; j < mapHeight; j++)
+            {
+                for (int i = 0; i < mapWidth; i++)
+                {
+                    if (i % 2 == j % 2)
+                    {
+                        continue;
+                    }
+
+                    TryPlacingRandomTile(i, j);
+                }
+            }
+
+            // second pass places random tiles in the mising holes, checking for matching edges
+            for (int j = 0; j < mapHeight; j++)
+            {
+                for (int i = 0; i < mapWidth; i++)
+                {
+                    int current = GetTileAt(i, j).tileID;
+                    if (current >= 0) // if tile already set, skip
+                    {
+                        continue;
+                    }
+
+                    //continue;
+
+                    TryPlacingRandomTile(i, j);
+                }
+            }
+        }
+
+        public void FixConnectivity()
+        {
+
+            // optional, detect isolate areas
+            List<WangArea> areas = new List<WangArea>();
+            for (int j = 0; j < Height; j++)
+            {
+                for (int i = 0; i < mapWidth; i++)
+                {
+                    int ofs = GetTileOffset(i, j);
+                    if (tiles[ofs].areaID != null) // check if this tile already have an area assigned
+                    {
+                        continue;
+                    }
+
+                    if (tiles[ofs].tileID == 0) // empty tiles should not be filled
+                    {
+                        continue;
+                    }
+
+                    var area = new WangArea();
+                    area.ID = areas.Count;
+                    areas.Add(area);
+                    FloodFillArea(i, j, area);
+                }
+            }
+
+            // join the isolated areas by adding exits to some tiles
+            HashSet<WangArea> areaSet = new HashSet<WangArea>();
+            for (int k = 0; k < areas.Count; k++)
+            {
+                JoinArea(null, areas[k], areaSet);
+                break;
+            }
+        }
+
+        public void Invert()
+        {
+            for (int j = 0; j < mapHeight; j++)
+            {
+                for (int i = 0; i < mapWidth; i++)
+                {
+                    int current = GetTileAt(i, j).tileID;
+                    if (current < 0) // if tile is not set, skip
+                    {
+                        continue;
+                    }
+
+                    SetTileAt(i, j, 15 - current);
+                }
+            }
+        }
+
+        private void TryPlacingRandomTile(int i, int j)
+        {
+            int left = GetTileAt(i - 1, j).tileID;
+            int right = GetTileAt(i + 1, j).tileID;
+            int up = GetTileAt(i, j - 1).tileID;
+            int down = GetTileAt(i, j + 1).tileID;
 
             /*List<int> matches = new List<int>();
             for (int newID=0; newID<16; newID++)
@@ -296,10 +493,11 @@ namespace Lunar.Utils
             }
 
             int n = matches[rnd.Next(matches.Count)];
-            SetMapAt(i, j, n);
+            SetTileAt(i, j, n);
         }
+
     }
 
-#endregion
+    #endregion
 
 }

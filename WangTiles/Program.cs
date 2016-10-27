@@ -96,29 +96,15 @@ namespace WangTiles
         }
         #endregion
 
-
-        private static Random rnd = new Random(3424);
-
-        private static Color GetAreaColor(WangArea area)
+        private static void RedrawWithTileset(WangMap map, Bitmap tileset)
         {
-            if (area == null)
+            for (int j = 0; j < map.Height; j++)
             {
-                return Color.FromArgb(0);
-            }
-
-            return area.GetColor();
-        }
-
-        private static void RedrawWithTileset(Bitmap tileset)
-        {
-            for (int j = 0; j < mapHeight; j++)
-            {
-                for (int i = 0; i < mapWidth; i++)
+                for (int i = 0; i < map.Width; i++)
                 {
-                    int ofs = GetMapOffset(i, j);
-                    int tileID = map[ofs].tileID;
-                    if (tileID < 0) { continue; }
-                    DrawTile(i * tileSize, j * tileSize, tileID, tileset, GetAreaColor(map[ofs].areaID));
+                    var tile = map.GetTileAt(i, j);
+                    if (tile.tileID < 0) { continue; }
+                    DrawTile(i * tileSize, j * tileSize, tile.tileID, tileset, WangUtils.GetAreaColor(tile.areaID));
                 }
             }
         }
@@ -141,87 +127,6 @@ namespace WangTiles
             }
         }
 
-        private static void FloodFillArea(int x, int y, WangArea areaID)
-        {
-            int ofs = GetMapOffset(x, y);
-            map[ofs].areaID = areaID;
-
-            // flood all adjacent tiles if possible
-            FloodFillArea(x - 1, y, areaID, WangDirection.East);
-            FloodFillArea(x + 1, y, areaID, WangDirection.West);
-            FloodFillArea(x, y - 1, areaID, WangDirection.South);
-            FloodFillArea(x, y + 1, areaID, WangDirection.North);
-        }
-
-        private static void FloodFillArea(int x, int y, WangArea areaID, WangDirection direction)
-        {
-            if (x<0 || y<0 || x>=mapWidth || y>=mapHeight) // if out of bounds, return
-            {
-                return;
-            }
-
-            int ofs = GetMapOffset(x, y);
-            if (map[ofs].areaID != null) // if already filled then stop
-            {
-                return;
-            }
-
-            if (map[ofs].tileID == 0) // empty tiles should not be filled
-            {
-                return;
-            }
-
-            if (WangUtils.GetConnectionForTile(map[ofs].tileID, direction) == false)
-            {
-                return;
-            }
-
-            FloodFillArea(x, y, areaID);
-        }
-
-        private static bool JoinArea(WangArea parent, WangArea area, HashSet<WangArea> areaSet)
-        {
-            if  (areaSet.Contains(area))
-            {
-                return false;
-            }
-
-            areaSet.Add(area);
-
-            Console.WriteLine("Testing area: " + GetAreaColor(area));
-
-            var result = FindTilesInAreaEdges(area);
-            if (result.Count <= 0)
-            {
-                return true;
-            }
-
-            foreach (var temp in result)
-            {
-                if (JoinArea(area, temp.Key, areaSet))
-                {
-                    area.children.Add(temp.Key);
-
-                    var tiles = temp.Value;
-                    var tile = tiles[rnd.Next(tiles.Count)];
-
-                    Console.WriteLine("Joined " + GetAreaColor(area) + " to " + GetAreaColor(temp.Key));
-
-                    if (GetAreaColor(temp.Key).Equals(Color.Yellow))
-                    {
-                        area.ID += 0;
-                    }
-
-                    int ofs = GetMapOffset(tile.x1, tile.y1);
-                    map[ofs].tileID = WangUtils.AddConnection(map[ofs].tileID, tile.exit);
-
-                    ofs = GetMapOffset(tile.x2, tile.y2);
-                    map[ofs].tileID = WangUtils.AddConnection(map[ofs].tileID, WangUtils.InvertDirection(tile.exit));
-                }
-            }
-
-            return true;
-        }
 
         public static void Main(string[] args)
         {
@@ -234,106 +139,21 @@ namespace WangTiles
                 var tileset = new Bitmap("../data/tileset"+i+".png");
                 tilesets.Add(tileset);
             }
-            
-            // first pass clears all tiles
-            for (int j = 0; j < mapHeight; j++)
-            {
-                for (int i = 0; i < mapWidth; i++)
-                {
-                    int ofs = GetMapOffset(i, j);
-                    map[ofs].areaID = null;
-                    map[ofs].tileID = -1;
-                }
-            }
-            
-            // second pass places random tiles in a checkerboard pattern
-            for (int j = 0; j < mapHeight; j++)
-            {
-                for (int i = 0; i < mapWidth; i++)
-                {
-                    if (i % 2 == j % 2)
-                    {
-                        continue;
-                    }
 
-                    TryPlacingRandomTile(i, j);
-                }
-            }
 
-            // third pass places random tiles in the mising holes, checking for matching edges
-            for (int j = 0; j < mapHeight; j++)
-            {
-                for (int i = 0; i < mapWidth; i++)
-                {
-                    int current = GetMapAt(i, j).tileID;
-                    if (current >= 0) // if tile already set, skip
-                    {
-                        continue;
-                    }
+            var map = new WangMap(16, 10, 3424);
 
-                    //continue;
+            map.Generate();
 
-                    TryPlacingRandomTile(i, j);
-                }
-            }
-
-            // optional pass, invert bits 
-            if (mapInvert)
-            {
-                for (int j = 0; j < mapHeight; j++)
-                {
-                    for (int i = 0; i < mapWidth; i++)
-                    {
-                        int current = GetMapAt(i, j).tileID;
-                        if (current < 0) // if tile is not set, skip
-                        {
-                            continue;
-                        }
-
-                        SetMapAt(i, j, 15 - current);
-                    }
-                }
-            }
-
-            // optional, detect isolate areas
-            List<WangArea> areas = new List<WangArea>(); 
-            for (int j = 0; j < mapHeight; j++)
-            {
-                for (int i = 0; i < mapWidth; i++)
-                {
-                    int ofs = GetMapOffset(i, j);
-                    if (map[ofs].areaID != null) // check if this tile already have an area assigned
-                    {
-                        continue; 
-                    }
-
-                    if (map[ofs].tileID == 0) // empty tiles should not be filled
-                    {
-                        continue;
-                    }
-
-                    var area = new WangArea();
-                    area.ID = areas.Count;
-                    areas.Add(area);
-                    FloodFillArea(i, j, area);
-                }
-            }
-
-            // join the isolated areas by adding exits to some tiles
-            HashSet<WangArea> areaSet = new HashSet<WangArea>();
-            for (int k=0;  k<areas.Count; k++)
-            {
-                JoinArea(null, areas[k], areaSet);
-                break;
-            }
+            map.FixConnectivity();
 
             // now render the map to a pixel array
-            RedrawWithTileset(tilesets[1]);
+            RedrawWithTileset(map, tilesets[1]);
 
 
             int bufferTexID = 0;
 
-            using (var game = new OpenTK.GameWindow(bufferWidth, bufferHeight))
+            using (var game = new OpenTK.GameWindow(bufferWidth, bufferHeight, OpenTK.Graphics.GraphicsMode.Default, "Wang Tiles"))
             {
                 game.Load += (sender, e) =>
                 {
@@ -362,47 +182,47 @@ namespace WangTiles
 
                     if (game.Keyboard[Key.Number1])
                     {
-                        RedrawWithTileset(tilesets[0]);
+                        RedrawWithTileset(map, tilesets[0]);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                     if (game.Keyboard[Key.Number2])
                     {
-                        RedrawWithTileset(tilesets[1]);
+                        RedrawWithTileset(map, tilesets[1]);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                     if (game.Keyboard[Key.Number3])
                     {
-                        RedrawWithTileset(tilesets[2]);
+                        RedrawWithTileset(map, tilesets[2]);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                     if (game.Keyboard[Key.Number4])
                     {
-                        RedrawWithTileset(tilesets[3]);
+                        RedrawWithTileset(map, tilesets[3]);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                     if (game.Keyboard[Key.Number5])
                     {
-                        RedrawWithTileset(tilesets[4]);
+                        RedrawWithTileset(map, tilesets[4]);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                     if (game.Keyboard[Key.Number6])
                     {
-                        RedrawWithTileset(tilesets[5]);
+                        RedrawWithTileset(map, tilesets[5]);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                     if (game.Keyboard[Key.Number7])
                     {
-                        RedrawWithTileset(tilesets[6]);
+                        RedrawWithTileset(map, tilesets[6]);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                     if (game.Keyboard[Key.Number8])
                     {
-                        RedrawWithTileset(tilesets[7]);
+                        RedrawWithTileset(map, tilesets[7]);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                     if (game.Keyboard[Key.Number9])
                     {
-                        RedrawWithTileset(tilesets[8]);
+                        RedrawWithTileset(map, tilesets[8]);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                 };

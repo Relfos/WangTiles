@@ -9,6 +9,101 @@ using System.Net;
 
 namespace WangTiles
 {
+    public class Tileset
+    {
+        private Dictionary<int, List<Bitmap>> tiles = new Dictionary<int, List<Bitmap>>();
+        private int tileSize;
+
+        public Tileset(string fileName)
+        {
+            var source = new Bitmap(fileName);
+
+            this.tileSize = source.Width / 16;
+
+            for (int i=0; i<16; i++)
+            {
+                List<Bitmap> variations = new List<Bitmap>();
+
+                int maxVariations = source.Height / tileSize;
+                for (int j=0; j<maxVariations; j++)
+                {
+                    Bitmap tile = new Bitmap(tileSize, tileSize);
+                    bool isEmpty = true;
+                    for (int y=0; y<tileSize; y++)
+                    {
+                        for (int x = 0; x < tileSize; x++)
+                        {
+                            var color = source.GetPixel(x + i * tileSize, y + j * tileSize);
+                            if (color.A<=0)
+                            {
+                                continue;
+                            }
+
+                            isEmpty = false;
+                            tile.SetPixel(x, y, color);
+                        }
+                    }
+
+                    if (isEmpty)
+                    {
+                        break;
+                    }
+
+                    variations.Add(tile);
+                }
+
+                tiles[i] = variations;
+            }
+        }
+
+
+        /// <summary>
+        /// Draws a tile in the texture buffer at specified position
+        /// </summary>
+        private void DrawTile(byte[] buffer, int bufferWidth, int bufferHeight, int targetX, int targetY, int tileID, int variation, Color borderColor)
+        {
+            var variations = tiles[tileID];
+
+            variation = variation % variations.Count;
+            Bitmap tile = variations[variation];
+
+            for (int y = 0; y < tileSize; y++)
+            {
+                for (int x = 0; x < tileSize; x++)
+                {
+                    if (x + targetX >= bufferWidth || x + targetX < 0) { continue; }
+                    if (y + targetY >= bufferHeight || y + targetY < 0) { continue; }
+                    int destOfs = ((x + targetX) + bufferWidth * (y + targetY)) * 4;
+                    var c = tile.GetPixel(x, y);
+
+                    if (borderColor.A > 0 && (x == 0 || y == 0 || x == tileSize - 1 || y == tileSize - 1))
+                    {
+                        c = borderColor;
+                    }
+
+                    buffer[destOfs + 0] = c.R;
+                    buffer[destOfs + 1] = c.G;
+                    buffer[destOfs + 2] = c.B;
+                    buffer[destOfs + 3] = c.A;
+                }
+            }
+        }
+
+        public void RedrawWithTileset(byte[] buffer, int bufferWidth, int bufferHeight, WangMap map)
+        {
+            for (int j = 0; j < map.Height; j++)
+            {
+                for (int i = 0; i < map.Width; i++)
+                {
+                    var tile = map.GetTileAt(i, j);
+                    if (tile.tileID < 0) { continue; }
+                    DrawTile(buffer, bufferWidth, bufferHeight, i * tileSize, j * tileSize, tile.tileID, i + i * j, WangUtils.GetAreaColor(tile.areaID));
+                }
+            }
+        }
+
+    }
+
     public class Example
     {
         #region TEXTURE_BUFFER_UTILS
@@ -64,50 +159,7 @@ namespace WangTiles
         }
         #endregion
 
-        #region TILESET
-        private const int tileSize = 32;
 
-        /// <summary>
-        /// Draws a tile in the texture buffer at specified position
-        /// </summary>
-        private static void DrawTile(int targetX, int targetY, int tileID, Bitmap tileset, Color borderColor)
-        {
-            for (int y = 0; y < tileSize; y++)
-            {
-                for (int x = 0; x < tileSize; x++)
-                {
-                    if (x+targetX>=bufferWidth || x+targetX<0) { continue; }
-                    if (y + targetY >= bufferHeight || y+targetY<0) { continue; }
-                    int destOfs = ((x + targetX) + bufferWidth * (y + targetY)) * 4;
-                    var c = tileset.GetPixel((tileID * tileSize) + x, y);
-
-                    if (borderColor.A>0 && ( x==0 || y== 0 || x == tileSize - 1 || y == tileSize - 1))
-                    {
-                        c = borderColor;
-                    }
-
-                    buffer[destOfs + 0] = c.R;
-                    buffer[destOfs + 1] = c.G;
-                    buffer[destOfs + 2] = c.B;
-                    buffer[destOfs + 3] = c.A;
-                }
-            }
-
-        }
-        #endregion
-
-        private static void RedrawWithTileset(WangMap map, Bitmap tileset)
-        {
-            for (int j = 0; j < map.Height; j++)
-            {
-                for (int i = 0; i < map.Width; i++)
-                {
-                    var tile = map.GetTileAt(i, j);
-                    if (tile.tileID < 0) { continue; }
-                    DrawTile(i * tileSize, j * tileSize, tile.tileID, tileset, WangUtils.GetAreaColor(tile.areaID));
-                }
-            }
-        }
 
         private static void DownloadTileset(string name)
         {
@@ -121,7 +173,7 @@ namespace WangTiles
                     client.DownloadFile(url, tempName);
                     Bitmap temp = new Bitmap(tempName);
                     Graphics g = Graphics.FromImage(target);
-                    g.DrawImage(temp, i * tileSize, 0);
+                    g.DrawImage(temp, i * 32, 0);
                 }
                 target.Save("tileset.png");
             }
@@ -132,11 +184,11 @@ namespace WangTiles
         {
             //DownloadTileset("walkway");
 
-            List<Bitmap> tilesets = new List<Bitmap>();
+            var tilesets = new List<Tileset>();
             // load tilesets
-            for (int i=1; i<=9; i++)
+            for (int i=0; i<=9; i++)
             {
-                var tileset = new Bitmap("../data/tileset"+i+".png");
+                var tileset = new Tileset("../data/tileset"+i+".png");
                 tilesets.Add(tileset);
             }
 
@@ -150,7 +202,8 @@ namespace WangTiles
             map.FixConnectivity();
 
             // now render the map to a pixel array
-            RedrawWithTileset(map, tilesets[1]);
+            int currentTileset = 0;
+            tilesets[currentTileset].RedrawWithTileset(buffer, bufferWidth, bufferHeight, map);
 
 
             int bufferTexID = 0;
@@ -182,49 +235,50 @@ namespace WangTiles
                         Environment.Exit(0);
                     }
 
+                    int oldTileset = currentTileset;
                     if (game.Keyboard[Key.Number1])
                     {
-                        RedrawWithTileset(map, tilesets[0]);
-                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                        currentTileset = 0;
                     }
                     if (game.Keyboard[Key.Number2])
                     {
-                        RedrawWithTileset(map, tilesets[1]);
-                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                        currentTileset = 1;
                     }
                     if (game.Keyboard[Key.Number3])
                     {
-                        RedrawWithTileset(map, tilesets[2]);
-                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                        currentTileset = 2;
                     }
                     if (game.Keyboard[Key.Number4])
                     {
-                        RedrawWithTileset(map, tilesets[3]);
-                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                        currentTileset = 3;
                     }
                     if (game.Keyboard[Key.Number5])
                     {
-                        RedrawWithTileset(map, tilesets[4]);
-                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                        currentTileset = 4;
                     }
                     if (game.Keyboard[Key.Number6])
                     {
-                        RedrawWithTileset(map, tilesets[5]);
-                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                        currentTileset = 5;
                     }
+
                     if (game.Keyboard[Key.Number7])
                     {
-                        RedrawWithTileset(map, tilesets[6]);
-                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                        currentTileset = 6;
                     }
+
                     if (game.Keyboard[Key.Number8])
                     {
-                        RedrawWithTileset(map, tilesets[7]);
-                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
+                        currentTileset = 7;
                     }
+
                     if (game.Keyboard[Key.Number9])
                     {
-                        RedrawWithTileset(map, tilesets[8]);
+                        currentTileset = 8;
+                    }
+
+                    if (oldTileset != currentTileset)
+                    {
+                        tilesets[currentTileset].RedrawWithTileset(buffer, bufferWidth, bufferHeight, map);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                 };

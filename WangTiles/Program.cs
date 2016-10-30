@@ -60,7 +60,7 @@ namespace WangTiles
         /// <summary>
         /// Draws a tile in the texture buffer at specified position
         /// </summary>
-        private void DrawTile(byte[] buffer, int bufferWidth, int bufferHeight, int targetX, int targetY, int tileID, int variation, Color borderColor)
+        private void DrawTile(byte[] buffer, int bufferWidth, int bufferHeight, int targetX, int targetY, int tileID, int variation, Color borderColor, int drawScale)
         {
             var variations = tiles[tileID];
 
@@ -70,10 +70,7 @@ namespace WangTiles
             for (int y = 0; y < tileSize; y++)
             {
                 for (int x = 0; x < tileSize; x++)
-                {
-                    if (x + targetX >= bufferWidth || x + targetX < 0) { continue; }
-                    if (y + targetY >= bufferHeight || y + targetY < 0) { continue; }
-                    int destOfs = ((x + targetX) + bufferWidth * (y + targetY)) * 4;
+                {                   
                     var c = tile.GetPixel(x, y);
 
                     if (borderColor.A > 0 && (x == 0 || y == 0 || x == tileSize - 1 || y == tileSize - 1))
@@ -81,15 +78,27 @@ namespace WangTiles
                         c = borderColor;
                     }
 
-                    buffer[destOfs + 0] = c.R;
-                    buffer[destOfs + 1] = c.G;
-                    buffer[destOfs + 2] = c.B;
-                    buffer[destOfs + 3] = c.A;
+                    for (int iy = 0; iy < drawScale; iy++)
+                    {
+                        for (int ix = 0; ix < drawScale; ix++)
+                        {
+                            int tx = targetX + x * drawScale + ix;
+                            int ty = targetY + y * drawScale + iy;
+                            if (tx >= bufferWidth || tx < 0) { continue; }
+                            if (ty >= bufferHeight || ty < 0) { continue; }
+
+                            int destOfs = (tx + bufferWidth * ty) * 4;
+                            buffer[destOfs + 0] = c.R;
+                            buffer[destOfs + 1] = c.G;
+                            buffer[destOfs + 2] = c.B;
+                            buffer[destOfs + 3] = c.A;
+                        }
+                    }
                 }
             }
         }
 
-        public void RedrawWithTileset(byte[] buffer, int bufferWidth, int bufferHeight, WangMap map)
+        public void RedrawWithTileset(byte[] buffer, int bufferWidth, int bufferHeight, WangMap map, bool drawBorders, int drawScale)
         {
             for (int j = 0; j < map.Height; j++)
             {
@@ -97,7 +106,8 @@ namespace WangTiles
                 {
                     var tile = map.GetTileAt(i, j);
                     if (tile.tileID < 0) { continue; }
-                    DrawTile(buffer, bufferWidth, bufferHeight, i * tileSize, j * tileSize, tile.tileID, i + i * j, WangUtils.GetAreaColor(tile.areaID));
+                    int variation = i + i * j;
+                    DrawTile(buffer, bufferWidth, bufferHeight, i * tileSize * drawScale, j * tileSize * drawScale, tile.tileID, variation, drawBorders ? WangUtils.GetAreaColor(tile.areaID) : Color.FromArgb(0), drawScale);
                 }
             }
         }
@@ -184,6 +194,9 @@ namespace WangTiles
         {
             //DownloadTileset("walkway");
 
+            bool drawBorders = false;
+            int drawScale = 2;
+
             var tilesets = new List<Tileset>();
             // load tilesets
             for (int i=0; i<=9; i++)
@@ -203,7 +216,7 @@ namespace WangTiles
 
             // now render the map to a pixel array
             int currentTileset = 0;
-            tilesets[currentTileset].RedrawWithTileset(buffer, bufferWidth, bufferHeight, map);
+            tilesets[currentTileset].RedrawWithTileset(buffer, bufferWidth, bufferHeight, map, drawBorders, drawScale);
 
 
             int bufferTexID = 0;
@@ -278,7 +291,7 @@ namespace WangTiles
 
                     if (oldTileset != currentTileset)
                     {
-                        tilesets[currentTileset].RedrawWithTileset(buffer, bufferWidth, bufferHeight, map);
+                        tilesets[currentTileset].RedrawWithTileset(buffer, bufferWidth, bufferHeight, map, drawBorders, drawScale);
                         UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
                     }
                 };

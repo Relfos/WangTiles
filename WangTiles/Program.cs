@@ -12,28 +12,29 @@ namespace WangTiles
     public class Tileset
     {
         private Dictionary<int, List<Bitmap>> tiles = new Dictionary<int, List<Bitmap>>();
-        private int tileSize;
+        private int _tileSize;
+        public int TileSize { get { return _tileSize; } }
 
         public Tileset(string fileName)
         {
             var source = new Bitmap(fileName);
 
-            this.tileSize = source.Width / 16;
+            this._tileSize = source.Width / 16;
 
             for (int i=0; i<16; i++)
             {
                 List<Bitmap> variations = new List<Bitmap>();
 
-                int maxVariations = source.Height / tileSize;
+                int maxVariations = source.Height / _tileSize;
                 for (int j=0; j<maxVariations; j++)
                 {
-                    Bitmap tile = new Bitmap(tileSize, tileSize);
+                    Bitmap tile = new Bitmap(_tileSize, _tileSize);
                     bool isEmpty = true;
-                    for (int y=0; y<tileSize; y++)
+                    for (int y=0; y<_tileSize; y++)
                     {
-                        for (int x = 0; x < tileSize; x++)
+                        for (int x = 0; x < _tileSize; x++)
                         {
-                            var color = source.GetPixel(x + i * tileSize, y + j * tileSize);
+                            var color = source.GetPixel(x + i * _tileSize, y + j * _tileSize);
                             if (color.A<=0)
                             {
                                 continue;
@@ -67,13 +68,13 @@ namespace WangTiles
             variation = variation % variations.Count;
             Bitmap tile = variations[variation];
 
-            for (int y = 0; y < tileSize; y++)
+            for (int y = 0; y < _tileSize; y++)
             {
-                for (int x = 0; x < tileSize; x++)
+                for (int x = 0; x < _tileSize; x++)
                 {                   
                     var c = tile.GetPixel(x, y);
 
-                    if (borderColor.A > 0 && (x == 0 || y == 0 || x == tileSize - 1 || y == tileSize - 1))
+                    if (borderColor.A > 0 && (x == 0 || y == 0 || x == _tileSize - 1 || y == _tileSize - 1))
                     {
                         c = borderColor;
                     }
@@ -107,7 +108,7 @@ namespace WangTiles
                     var tile = map.GetTileAt(i, j);
                     if (tile.tileID < 0) { continue; }
                     int variation = i + i * j;
-                    DrawTile(buffer, bufferWidth, bufferHeight, i * tileSize * drawScale, j * tileSize * drawScale, tile.tileID, variation, drawBorders ? WangUtils.GetAreaColor(tile.areaID) : Color.FromArgb(0), drawScale);
+                    DrawTile(buffer, bufferWidth, bufferHeight, i * _tileSize * drawScale, j * _tileSize * drawScale, tile.tileID, variation, drawBorders ? WangUtils.GetAreaColor(tile.areaID) : Color.FromArgb(0), drawScale);
                 }
             }
         }
@@ -191,7 +192,7 @@ namespace WangTiles
             //DownloadTileset("walkway");
 
             bool drawBorders = false;
-            int drawScale = 2;
+            int drawScale = 4;
 
             var tilesets = new List<Tileset>();
             // load tilesets
@@ -202,13 +203,34 @@ namespace WangTiles
             }
 
 
-            var map = new WangMap(16, 10, 3424);
+            var map = new WangMap(14, 9, 3424);
 
-            map.AddExit(1, -1);
+            int exitX = 1;
+            int exitY = -1;
 
+            map.AddExit(exitX, exitY);
             map.Generate();
-
             map.FixConnectivity();
+
+            LayoutPlanner planner = new LayoutPlanner(4343);
+            for (int j=0; j<map.Height; j++)
+            {
+                for (int i = 0; i < map.Width; i++)
+                {
+                    bool north, south, east, west;
+                    WangUtils.GetConnectionsForTile(map.GetTileAt(i, j).tileID, out north, out east, out south, out west);
+
+                    if (north) { planner.AddConnection(new LayoutCoord(i, j), WangDirection.North); }
+                    if (south) { planner.AddConnection(new LayoutCoord(i, j), WangDirection.South); }
+                    if (east) { planner.AddConnection(new LayoutCoord(i, j), WangDirection.East); }
+                    if (west) { planner.AddConnection(new LayoutCoord(i, j), WangDirection.West); }
+                }
+            }
+            planner.entrance = planner.FindRoomAt(new LayoutCoord(exitX, exitY));
+            Console.WriteLine("Selected entrance: " + planner.entrance);
+
+            var goal = planner.FindGoal();
+            Console.WriteLine("Selected goal: " + goal);
 
             // now render the map to a pixel array
             int currentTileset = 0;
@@ -216,6 +238,9 @@ namespace WangTiles
 
 
             int bufferTexID = 0;
+
+            int selX = -1;
+            int selY = -1;
 
             using (var game = new OpenTK.GameWindow(bufferWidth, bufferHeight, OpenTK.Graphics.GraphicsMode.Default, "Wang Tiles"))
             {
@@ -234,6 +259,24 @@ namespace WangTiles
                 game.Resize += (sender, e) =>
                 {
                     GL.Viewport(0, 0, game.Width, game.Height);
+                };
+
+
+                game.Mouse.Move += (object sender, MouseMoveEventArgs mouseEvent) =>
+                {
+                    var mousePos = mouseEvent.Position;
+                    //mousePos = game.PointToClient(mousePos);
+
+                    //Console.WriteLine(mousePos.X + "    " + mousePos.Y);
+
+                    selX = (mousePos.X) / (drawScale * tilesets[currentTileset].TileSize);
+                    selY = (mousePos.Y) / (drawScale * tilesets[currentTileset].TileSize);
+
+                    if (selX >= map.Width) { selX = -1; }
+                    if (selY >= map.Height) { selY = -1; }
+                };
+
+                game.Mouse.ButtonDown += (object sender, MouseButtonEventArgs buttonEvent) => {
                 };
 
                 game.UpdateFrame += (sender, e) =>
@@ -306,7 +349,11 @@ namespace WangTiles
                     DrawBuffer(game, bufferTexID);
 
 
-                    FontUtils.DrawText(game, "Hello world", game.Width * 0.5f, 0, 1, Color.Blue, true);
+                    if (selX>=0 && selY >=0)
+                    {
+                        var selRoom = planner.FindRoomAt(new LayoutCoord(selX, selY));
+                        FontUtils.DrawText(game,  selRoom.ToString(), 4, 0, 1, Color.White);
+                    }
 
                     game.SwapBuffers();
                 };

@@ -54,7 +54,7 @@ namespace Lunar.Utils
 
         public LayoutCoord coord;
 
-        public List<LayoutConnection> connections;
+        public List<LayoutConnection> connections = new List<LayoutConnection>();
 
         public int distance;
         public LayoutRoom previous;
@@ -73,6 +73,8 @@ namespace Lunar.Utils
 
         public int order;
 
+        public int tileID;
+
         public LayoutRoom parent;
         public List<LayoutRoom> children = new List<LayoutRoom>();
 
@@ -90,12 +92,12 @@ namespace Lunar.Utils
 
         public override string ToString()
         {
-            return this.kind + "("+ name+")";
+            return this.kind + " ("+ name+")";
         }
 
         public bool IsDeadEnd()
         {
-            return false;
+            return tileID<5;
         }
 
         internal LayoutRoom GetRoot()
@@ -122,6 +124,19 @@ namespace Lunar.Utils
                     vRoot1.rank++;//increment one of them, we need to reach a single root for the whole tree  
                 }
             }
+        }
+
+        public LayoutConnection FindConnection(LayoutRoom room)
+        {
+            foreach (var conn in connections)
+            {
+                if (conn.roomA == room || conn.roomB == room)
+                {
+                    return conn;
+                }
+            }
+
+            return null;
         }
     }
 
@@ -155,8 +170,6 @@ namespace Lunar.Utils
         Goal
     }
 
-
-
     public class LayoutPlanner
     {
         private Random randomGenerator;
@@ -168,9 +181,60 @@ namespace Lunar.Utils
         private Dictionary<LayoutCoord, LayoutRoom> rooms = new Dictionary<LayoutCoord, LayoutRoom>();
         //private Dictionary<LayoutRoom, RoomInfo> roomInfo = new Dictionary<LayoutRoom, RoomInfo>();
 
-        public LayoutPlanner(Random randomGenerator)
+        public LayoutPlanner(int seed)
         {
-            this.randomGenerator = randomGenerator;           
+            if (seed == 0)
+            {
+                seed = Environment.TickCount;
+            }
+            this.randomGenerator = new Random(seed);
+        }
+
+        public LayoutRoom AddRoom(LayoutCoord coord, int tileID)
+        {
+            var room = FindRoomAt(coord);
+            room.tileID = tileID;
+            return room;
+        }
+
+        public LayoutConnection AddConnection(LayoutCoord a, LayoutCoord b)
+        {
+            return AddConnection(FindRoomAt(a), FindRoomAt(b));
+        }
+
+        public LayoutConnection AddConnection(LayoutCoord a, WangDirection dir)
+        {
+            LayoutCoord b;
+            
+            switch (dir)
+            {
+                case WangDirection.East: b = new LayoutCoord(a.X + 1, a.Y); break;
+                case WangDirection.West: b = new LayoutCoord(a.X - 1, a.Y); break;
+                case WangDirection.North: b = new LayoutCoord(a.X, a.Y - 1); break;
+                case WangDirection.South: b = new LayoutCoord(a.X, a.Y + 1); break;
+                default:return null;
+            }
+             
+            return AddConnection(FindRoomAt(a), FindRoomAt(b));
+        }
+
+        public LayoutConnection AddConnection(LayoutRoom roomA, LayoutRoom roomB)
+        {
+            if (roomA == roomB)
+            {
+                return null;
+            }
+
+            LayoutConnection conn = roomA.FindConnection(roomB);
+            if (conn != null)
+            {
+                return conn;
+            }
+
+            conn = new LayoutConnection(roomA, roomB, this.randomGenerator);
+            roomA.connections.Add(conn);
+            roomB.connections.Add(conn);
+            return conn;
         }
 
         public LayoutRoom FindRoomAt(LayoutCoord coord)
@@ -256,8 +320,8 @@ namespace Lunar.Utils
             foreach (var room in rooms.Values)
             {
                 room.distance = 99999;   // Unknown distance from source to v
-                room.previous = null;                 // Previous node in optimal path from source
-                Q.Add(room);                         // All nodes initially in Q (unvisited nodes)
+                room.previous = null;    // Previous node in optimal path from source
+                Q.Add(room);             // All nodes initially in Q (unvisited nodes)
             }
 
             entrance.distance = 0;                        // Distance from source to source
@@ -719,8 +783,6 @@ namespace Lunar.Utils
 
                         keyDistance--;
                     }
-
-
 
                 }
                 else

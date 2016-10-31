@@ -4,22 +4,93 @@ using System.Drawing;
 
 namespace Lunar.Utils
 {
+    public struct LayoutCoord
+    {
+        public int X;
+        public int Y;
+
+        public LayoutCoord(int x, int y)
+        {
+            this.X = x;
+            this.Y = y;
+        }
+
+        public override int GetHashCode()
+        {
+            unchecked // Overflow is fine, just wrap
+            {
+                int hash = 17;
+                // Suitable nullity checks etc, of course :)
+                hash = hash * 23 + X.GetHashCode();
+                hash = hash * 23 + Y.GetHashCode();
+                return hash;
+            }
+        }
+    }
+
+    public class LayoutConnection
+    {
+        public LayoutRoom roomA;
+        public LayoutRoom roomB;
+        public bool active;
+        public int weight;
+        public int pathOrder;
+
+        public LayoutConnection(LayoutRoom roomA, LayoutRoom roomB, Random rnd)
+        {
+            active = true;
+            weight = 1 + rnd.Next(10);
+            pathOrder = -1;
+            this.roomA = roomA;
+            this.roomB = roomB;
+        }
+    }
+
     public class LayoutRoom
     {
         public string name;
         private LayoutRoom root;
         public int rank;
 
-        public LayoutRoom(string name)
+        public LayoutCoord coord;
+
+        public List<LayoutConnection> connections;
+
+        public int distance;
+        public LayoutRoom previous;
+
+        public RoomKind kind;
+
+        public float intensity;
+        public bool spike;
+
+        public bool lockable;
+        public bool important;
+
+        public LayoutKey require;
+        public LayoutKey contains;
+        public LayoutKey locked;
+
+        public int order;
+
+        public LayoutRoom parent;
+        public List<LayoutRoom> children = new List<LayoutRoom>();
+
+        public LayoutRoom(LayoutCoord coord)
         {
-            this.name = name;
+            this.name = coord.X + " : "+ coord.Y;
+            this.coord = coord;
             this.rank = 0;
             this.root = this;
+
+            this.kind = RoomKind.Hall;
+            this.intensity = -1;
+            this.lockable = true;
         }
 
         public override string ToString()
         {
-            return name;
+            return this.kind + "("+ name+")";
         }
 
         public bool IsDeadEnd()
@@ -85,37 +156,6 @@ namespace Lunar.Utils
     }
 
 
-    public class RoomInfo
-    {
-        public LayoutRoom room;
-        public int distance;
-        public LayoutRoom previous;
-
-        public RoomKind kind;
-
-        public float intensity;
-        public bool spike;
-
-        public bool lockable;
-        public bool important;
-
-        public LayoutKey require;
-        public LayoutKey contains;
-        public LayoutKey locked;
-
-        public int order;
-
-        public LayoutRoom parent;
-        public List<LayoutRoom> children = new List<LayoutRoom>();
-
-        public RoomInfo(LayoutRoom room)
-        {
-            this.kind = RoomKind.Hall;
-            this.intensity = -1;
-            this.lockable = true;
-            this.room = room;
-        }
-    }
 
     public class LayoutPlanner
     {
@@ -124,30 +164,25 @@ namespace Lunar.Utils
         public LayoutRoom entrance;
         public LayoutRoom goal;
 
-        private List<LayoutRoom> rooms;
+        public List<LayoutConnection> connections;
+        private Dictionary<LayoutCoord, LayoutRoom> rooms = new Dictionary<LayoutCoord, LayoutRoom>();
+        //private Dictionary<LayoutRoom, RoomInfo> roomInfo = new Dictionary<LayoutRoom, RoomInfo>();
 
-        private Dictionary<LayoutRoom, RoomInfo> roomInfo = new Dictionary<LayoutRoom, RoomInfo>();
-
-        public LayoutPlanner(List<LayoutRoom> rooms, Random randomGenerator)
+        public LayoutPlanner(Random randomGenerator)
         {
-            this.randomGenerator = randomGenerator;
-            this.rooms = rooms;
-
-            foreach (var room in rooms)
-            {
-                RoomInfo info = new RoomInfo(room);
-                roomInfo[room] = info;
-            }
-
-            UpdateRoomNames();
+            this.randomGenerator = randomGenerator;           
         }
 
-        protected void UpdateRoomNames()
+        public LayoutRoom FindRoomAt(LayoutCoord coord)
         {
-            foreach (var room in rooms)
+            if (rooms.ContainsKey(coord))
             {
-                room.name = roomInfo[room].kind.ToString();
+                return rooms[coord];
             }
+
+            var room = new LayoutRoom(coord);
+            rooms[coord] = room;
+            return room;
         }
 
         public struct RoomScore
@@ -166,21 +201,12 @@ namespace Lunar.Utils
             return 10;
         }
 
-        public RoomInfo GetRoomInfo(LayoutRoom room)
-        {
-            if (roomInfo.ContainsKey(room))
-            {
-                return roomInfo[room];
-            }
-            return null;
-        }
-
         public LayoutRoom FindEntrance()
         {
             entrance = null;
 
             List<RoomScore> temp = new List<RoomScore>();
-            foreach (var room in rooms)
+            foreach (var room in rooms.Values)
             {
                 int score = GetRoomScore(room);
 
@@ -211,9 +237,8 @@ namespace Lunar.Utils
 
             entrance = temp[randomGenerator.Next((temp.Count < 3 ? temp.Count : 3))].room;
 
-            roomInfo[entrance].kind = RoomKind.Entrance;
-
-            UpdateRoomNames();
+            entrance.kind = RoomKind.Entrance;
+            
             return entrance;
         }
 
@@ -228,52 +253,53 @@ namespace Lunar.Utils
 
             // find goal room
             List<LayoutRoom> Q = new List<LayoutRoom>();
-            foreach (var room in rooms)
+            foreach (var room in rooms.Values)
             {
-                roomInfo[room].distance = 99999;   // Unknown distance from source to v
-                roomInfo[room].previous = null;                 // Previous node in optimal path from source
+                room.distance = 99999;   // Unknown distance from source to v
+                room.previous = null;                 // Previous node in optimal path from source
                 Q.Add(room);                         // All nodes initially in Q (unvisited nodes)
             }
 
-            roomInfo[entrance].distance = 0;                        // Distance from source to source
+            entrance.distance = 0;                        // Distance from source to source
             while (Q.Count > 0)
             {
                 LayoutRoom best = null;
                 int min = 9999;
                 foreach (LayoutRoom other in Q)
                 {
-                    if (roomInfo[other].distance < min)
+                    if (other.distance < min)
                     {
-                        min = roomInfo[other].distance;
+                        min = other.distance;
                         best = other;
                     }
                 }
 
                 Q.Remove(best);
-                foreach (var path in best.Connections) // where path is still in Q.
+                foreach (var path in best.connections) // where V is still in Q.
                 {
+                    LayoutRoom V = path.roomA == best ? path.roomB : path.roomA;
                     if (!path.active)
                     {
                         continue;
                     }
 
-                    if (!Q.Contains(path))
+                    if (!Q.Contains(V))
                     {
                         continue;
                     }
 
-                    int alt = roomInfo[best].distance + path.weight;
-                    if (alt < roomInfo[path].distance)
+                    int alt = best.distance + path.weight;
+                    if (alt < V.distance)
                     {
-                        roomInfo[path].distance = alt;
-                        roomInfo[path].previous = best;
+                        V.distance = alt;
+                        V.previous = best;
                     }
                 }
             }
 
             goal = null;
             int maxGoal = 0;
-            foreach (var room in rooms)
+            foreach (var room in rooms.Values)
             {
                 if (room == entrance)
                 {
@@ -285,7 +311,7 @@ namespace Lunar.Utils
                     continue;
                 }
 
-                int dist = roomInfo[room].distance;
+                int dist = room.distance;
                 if (dist > maxGoal)
                 {
                     int score = GetRoomScore(room);
@@ -304,9 +330,9 @@ namespace Lunar.Utils
                 return null;
             }
 
-            roomInfo[goal].kind = RoomKind.Goal;
+            goal.kind = RoomKind.Goal;
 
-            UpdateRoomNames();
+            //UpdateRoomNames();
             //Debug.LogWarning("Found goal: " + goal.FloorLevel);
             return goal;
         }
@@ -322,13 +348,13 @@ namespace Lunar.Utils
 
         protected void FindChildrenProgression(ref int currentOrder, LayoutRoom startRoom, List<LayoutRoom> visitedRooms)
         {
-            roomInfo[startRoom].order = currentOrder;
+            startRoom.order = currentOrder;
             currentOrder++;
             visitedRooms.Add(startRoom);
 
             //Debug.Log("Semantic for " + this.Name);
-            roomInfo[startRoom].children = new List<LayoutRoom>();
-            foreach (var path in startRoom.Connections)
+            startRoom.children = new List<LayoutRoom>();
+            foreach (var path in startRoom.connections)
             {
                 //Debug.Log("Found connection to " + other.Name + " -> " + other.visited + " order: "+ path.pathOrder);
                 if (path.pathOrder < 0)
@@ -336,38 +362,40 @@ namespace Lunar.Utils
                     continue;
                 }
 
-                if (!visitedRooms.Contains(path.other))
+                var other = path.roomA == startRoom ? path.roomB : path.roomA;
+
+                if (!visitedRooms.Contains(other))
                 {
-                    roomInfo[path.other].parent = startRoom;
-                    roomInfo[startRoom].children.Add(path.other);
-                    FindChildrenProgression(ref currentOrder, path.other, visitedRooms);
+                    other.parent = startRoom;
+                    startRoom.children.Add(other);
+                    FindChildrenProgression(ref currentOrder, other, visitedRooms);
                 }
             }
         }
 
         protected void CalculateIntensity(LayoutRoom room, float value)
         {
-            if (roomInfo[room].intensity >= 0)
+            if (room.intensity >= 0)
             {
                 return;
             }
 
-            roomInfo[room].spike = false;
+            room.spike = false;
 
-            if (roomInfo[room].kind == RoomKind.Goal)
+            if (room.kind == RoomKind.Goal)
             {
                 value += 3;
-                roomInfo[room].spike = true;
+                room.spike = true;
             }
             else
             {
-                if (roomInfo[room].contains != null)
+                if (room.contains != null)
                 {
                     value += 1.5f;
-                    roomInfo[room].spike = true;
+                    room.spike = true;
                 }
                 else
-                if (roomInfo[room].important)
+                if (room.important)
                 {
                     value += 1;
                 }
@@ -376,21 +404,21 @@ namespace Lunar.Utils
                     value += 0.2f;
                 }
 
-                if (roomInfo[room].kind == RoomKind.Treasure)
+                if (room.kind == RoomKind.Treasure)
                 {
                     value += 0.5f;
-                    roomInfo[room].spike = true;
+                    room.spike = true;
                 }
 
-                if (roomInfo[room].parent != null && roomInfo[roomInfo[room].parent].spike)
+                if (room.parent != null && room.parent.spike)
                 {
                     value -= 2;
                 }
             }
 
-            roomInfo[room].intensity = value;
+            room.intensity = value;
 
-            foreach (var child in roomInfo[room].children)
+            foreach (var child in room.children)
             {
                 CalculateIntensity(child, value);
             }
@@ -398,46 +426,47 @@ namespace Lunar.Utils
 
         protected void GenerateIntensity()
         {
-            foreach (var room in rooms)
+            foreach (var room in rooms.Values)
             {
-                roomInfo[room].intensity = -1;
+                room.intensity = -1;
             }
 
             CalculateIntensity(entrance, 0);
 
-            float max = roomInfo[goal].intensity;
+            float max = goal.intensity;
 
-            foreach (var room in rooms)
+            foreach (var room in rooms.Values)
             {
-                if (roomInfo[room].intensity >= max)
+                if (room.intensity >= max)
                 {
-                    roomInfo[room].intensity = max;
+                    room.intensity = max;
                 }
             }
 
             max += 1;
-            roomInfo[goal].intensity = max;
-
-            foreach (var room in rooms)
+            goal.intensity = max;
+            
+            // normalize intensities
+            foreach (var room in rooms.Values)
             {
-                roomInfo[room].intensity /= max;
+                room.intensity /= max;
                 //    Debug.Log(room.Name + " => " + ((int)(room.intensity * 100.0f)).ToString());
             }
         }
 
         protected bool CanBeLocked(LayoutRoom room)
         {
-            if (roomInfo[room].parent == null)
+            if (room.parent == null)
             {
                 return false;
             }
 
-            if (!roomInfo[room].lockable)
+            if (!room.lockable)
             {
                 return false;
             }
 
-            if (roomInfo[room].kind == RoomKind.Entrance)
+            if (room.kind == RoomKind.Entrance)
             {
                 return false;
             }
@@ -461,32 +490,32 @@ namespace Lunar.Utils
 
             testedRooms.Add(currentRoom);
 
-            if (roomInfo[currentRoom].locked == null)
+            if (currentRoom.locked == null)
             {
-                if (roomInfo[currentRoom].require != null || (roomInfo[currentRoom].intensity < maxIntensity && CanBeLocked(currentRoom)))
+                if (currentRoom.require != null || (currentRoom.intensity < maxIntensity && CanBeLocked(currentRoom)))
                 {
                     return currentRoom;
                 }
 
             }
 
-            if (roomInfo[currentRoom].parent == null)
+            if (currentRoom.parent == null)
             {
                 return null;
             }
 
-            return FindLockableRoom(roomInfo[currentRoom].parent, testedRooms, maxIntensity);
+            return FindLockableRoom(currentRoom.parent, testedRooms, maxIntensity);
         }
 
         protected void LockRoom(LayoutRoom room, LayoutKey keylock)
         {
-            if (roomInfo[room].locked == null)
+            if (room.locked == null)
             {
-                roomInfo[room].locked = keylock;
+                room.locked = keylock;
                 //Debug.Log("Locked " + this.Name);
             }
 
-            foreach (var child in roomInfo[room].children)
+            foreach (var child in room.children)
             {
                 LockRoom(child, keylock);
             }
@@ -499,7 +528,7 @@ namespace Lunar.Utils
                 return false;
             }
 
-            return (roomInfo[room].kind != RoomKind.Goal && roomInfo[room].kind != RoomKind.Entrance);
+            return (room.kind != RoomKind.Goal && room.kind != RoomKind.Entrance);
         }
 
         public void PlaceKey(LayoutRoom sourceRoom, LayoutKey key, LayoutRoom targetRoom, List<LayoutRoom> testedRooms, int count, bool deadEndsonly)
@@ -509,7 +538,7 @@ namespace Lunar.Utils
                 return;
             }
 
-            if (roomInfo[sourceRoom].locked != null)
+            if (sourceRoom.locked != null)
             {
                 return;
             }
@@ -525,7 +554,7 @@ namespace Lunar.Utils
 
             if (sourceRoom != targetRoom && CanPlaceKey(sourceRoom, deadEndsonly))
             {
-                if (roomInfo[sourceRoom].contains != null)
+                if (sourceRoom.contains != null)
                 {
                     return;
                 }
@@ -535,21 +564,21 @@ namespace Lunar.Utils
                     //Debug.Log("Placed " + key.name + " in room " + sourceRoom);
 
                     key.room = sourceRoom;
-                    roomInfo[sourceRoom].contains = key;
+                    sourceRoom.contains = key;
                     return;
                 }
             }
 
             List<LayoutRoom> rooms = new List<LayoutRoom>();
-            if (roomInfo[sourceRoom].parent != null && !testedRooms.Contains(roomInfo[sourceRoom].parent))
+            if (sourceRoom.parent != null && !testedRooms.Contains(sourceRoom.parent))
             {
-                rooms.Add(roomInfo[sourceRoom].parent);
+                rooms.Add(sourceRoom.parent);
             }
 
 
             if (sourceRoom != targetRoom)
             {
-                foreach (var child in roomInfo[sourceRoom].children)
+                foreach (var child in sourceRoom.children)
                 {
                     if (!testedRooms.Contains(child))
                     {
@@ -582,17 +611,17 @@ namespace Lunar.Utils
 
         protected bool IsRoomImportant(LayoutRoom room)
         {
-            if (roomInfo[room].important)
+            if (room.important)
             {
                 return true;
             }
 
-            if (roomInfo[room].contains != null)
+            if (room.contains != null)
             {
                 return true;
             }
 
-            foreach (var child in roomInfo[room].children)
+            foreach (var child in room.children)
             {
                 if (IsRoomImportant(child))
                 {
@@ -640,15 +669,14 @@ namespace Lunar.Utils
                     //Debug.Log("Found lockable room " + targetRoom.Name);
                     LayoutKey targetKey = null;
 
-                    if (roomInfo[targetRoom].require != null && openKeys.Contains(roomInfo[targetRoom].require))
+                    if (targetRoom.require != null && openKeys.Contains(targetRoom.require))
                     {
-                        targetKey = roomInfo[targetRoom].require;
+                        targetKey = targetRoom.require;
                     }
                     else
                     {
                         int n = this.randomGenerator.Next(openKeys.Count);
                         targetKey = openKeys[n];
-
                     }
 
                     int minKeyDist = 1;
@@ -656,20 +684,20 @@ namespace Lunar.Utils
                     while (keyDistance >= minKeyDist)
                     {
                         //Debug.Log("Trying to find room for " + targetKey.name + " at distance " + keyDistance);
-                        PlaceKey(roomInfo[targetRoom].parent, targetKey, targetRoom, new List<LayoutRoom>(), keyDistance, true);
+                        PlaceKey(targetRoom.parent, targetKey, targetRoom, new List<LayoutRoom>(), keyDistance, true);
                         if (targetKey.room == null)
                         {
-                            PlaceKey(roomInfo[targetRoom].parent, targetKey, targetRoom, new List<LayoutRoom>(), keyDistance, false);
+                            PlaceKey(targetRoom.parent, targetKey, targetRoom, new List<LayoutRoom>(), keyDistance, false);
                         }
 
                         if (targetKey.room != null)
                         {
                             LockRoom(targetRoom, targetKey);
-                            roomInfo[targetRoom].require = targetKey;
+                            targetRoom.require = targetKey;
                             targetKey.condition = currentCondition;
                             currentCondition--;
 
-                            maxLockableIntensity = roomInfo[targetRoom].intensity * 0.8f;
+                            maxLockableIntensity = targetRoom.intensity * 0.8f;
                             float intensityLimit = 0.4f;
                             if (maxLockableIntensity < intensityLimit)
                             {
@@ -678,14 +706,14 @@ namespace Lunar.Utils
 
 
                             openKeys.Remove(targetKey);
-                            currentRoom = roomInfo[targetRoom].parent;
+                            currentRoom = targetRoom.parent;
 
                             found = true;
                             break;
                         }
                         else
                         {
-                            roomInfo[targetRoom].require = null;
+                            targetRoom.require = null;
                             //Debug.Log("Unable to place key " + targetKey.name);
                         }
 
@@ -701,7 +729,6 @@ namespace Lunar.Utils
                 }
 
 
-
                 if (!found)
                 {
                     break;
@@ -714,26 +741,26 @@ namespace Lunar.Utils
             }
 
             // after generating the locks, its now possible to understand which rooms are important and which ones are optional
-            roomInfo[goal].important = true;
-            roomInfo[entrance].important = true;
-            foreach (var room in rooms)
+            goal.important = true;
+            entrance.important = true;
+            foreach (var room in rooms.Values)
             {
-                roomInfo[room].important = IsRoomImportant(room);
+                room.important = IsRoomImportant(room);
             }
 
             // convert non-deadend with keys into puzzle rooms
-            foreach (var room in rooms)
+            foreach (var room in rooms.Values)
             {
-                if (roomInfo[room].contains != null /*&& !room.IsDeadEnd()*/)
+                if (room.contains != null /*&& !room.IsDeadEnd()*/)
                 {
                     int n = this.randomGenerator.Next(8);
                     if (n > 2)
                     {
-                        roomInfo[room].kind = RoomKind.Puzzle;
+                        room.kind = RoomKind.Puzzle;
                     }
                     else
                     {
-                        roomInfo[room].kind = RoomKind.Treasure;
+                        room.kind = RoomKind.Treasure;
                     }
 
                 }
@@ -742,14 +769,14 @@ namespace Lunar.Utils
             // generate intensity for rooms based on tension curve 
             GenerateIntensity();
 
-            UpdateRoomNames();
+            //UpdateRoomNames();
         }
 
         protected int GetRoomCondition(LayoutRoom room)
         {
-            if (roomInfo[room].locked != null)
+            if (room.locked != null)
             {
-                return roomInfo[room].locked.condition;
+                return room.locked.condition;
             }
             return -1;
         }
@@ -790,22 +817,22 @@ namespace Lunar.Utils
             }
 
             // generate monster rooms
-            foreach (var room in rooms)
+            foreach (var room in rooms.Values)
             {
-                if (roomInfo[room].kind == RoomKind.Treasure)
+                if (room.kind == RoomKind.Treasure)
                 {
                     int n = this.randomGenerator.Next(6);
 
                     switch (n)
                     {
-                        case 0: roomInfo[room].kind = RoomKind.Shrine; break;
-                        case 1: roomInfo[room].kind = RoomKind.Farm; break;
-                        default: roomInfo[room].kind = RoomKind.Monster; break;
+                        case 0: room.kind = RoomKind.Shrine; break;
+                        case 1: room.kind = RoomKind.Farm; break;
+                        default: room.kind = RoomKind.Monster; break;
                     }
                 }
             }
 
-            UpdateRoomNames();
+            //UpdateRoomNames();
         }
 
     }

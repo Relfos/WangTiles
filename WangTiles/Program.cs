@@ -141,12 +141,6 @@ namespace WangTiles
             float px = 0;
             float py = 0;
 
-            GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
-
-            GL.MatrixMode(MatrixMode.Projection);
-            GL.LoadIdentity();
-            GL.Ortho(0.0, 1.0, 0.0, 1.0, 0.0, 4.0);
-
             GL.Enable(EnableCap.Texture2D);
             GL.BindTexture(TextureTarget.Texture2D, textureID);
 
@@ -166,6 +160,8 @@ namespace WangTiles
             GL.Vertex2(px + w, py + h);
 
             GL.End();
+
+            GL.Disable(EnableCap.Texture2D);
         }
         #endregion
 
@@ -299,8 +295,19 @@ namespace WangTiles
 
                 game.RenderFrame += (sender, e) =>
                 {
+                    GL.Clear(ClearBufferMask.ColorBufferBit | ClearBufferMask.DepthBufferBit);
+
+                    GL.MatrixMode(MatrixMode.Projection);
+                    GL.LoadIdentity();
+                    GL.Ortho(0.0, 1.0, 0.0, 1.0, 0.0, 4.0);
+
+
                     // draw the texture to the screen, stretched to fill the whole window
                     DrawBuffer(game, bufferTexID);
+
+
+                    FontUtils.DrawText(game, "Hello world", game.Width * 0.5f, 0, 1, Color.Blue, true);
+
                     game.SwapBuffers();
                 };
 

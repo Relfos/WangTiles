@@ -469,7 +469,6 @@ namespace Lunar.Utils
 
         public void FixConnectivity()
         {
-
             // optional, detect isolate areas
             List<WangArea> areas = new List<WangArea>();
             for (int j = 0; j < Height; j++)
@@ -498,10 +497,32 @@ namespace Lunar.Utils
             HashSet<WangArea> areaSet = new HashSet<WangArea>();
             for (int k = 0; k < areas.Count; k++)
             {
-                JoinArea(null, areas[k], areaSet);
-                break;
+                var area = areas[k];
+                if (k == 0)
+                {
+                    JoinArea(null, area, areaSet);
+                }
+                else
+                if (!areaSet.Contains(area))
+                {
+                    DeleteArea(area);
+                }                
             }
         }
+
+        private void DeleteArea(WangArea area)
+        {
+            for (int j = 0; j < _height; j++)
+            {
+                for (int i = 0; i < _width; i++)
+                {
+                    if (GetTileAt(i, j).areaID == area)
+                    {
+                        SetTileAt(i, j, 0);
+                    }
+                }
+            }
+       }
 
         public void Invert()
         {

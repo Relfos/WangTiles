@@ -244,8 +244,12 @@ namespace WangTiles
             var goal = planner.FindGoal();
             Console.WriteLine("Selected goal: " + goal);
 
+            List<LayoutKey> keys = new List<LayoutKey>();
+            keys.Add(new LayoutKey("Test Key", 0, 1));
+
             planner.GenerateProgression();
             planner.GenerateRoomTypes();
+            planner.GenerateLocks(keys);
             #endregion
 
 
@@ -372,7 +376,19 @@ namespace WangTiles
                         if (selRoom!=null)
                         {
                             int percent = ((int)(selRoom.intensity * 100));
-                            FontUtils.DrawText(game, selRoom.order + "# " + selRoom.ToString() + " " + selRoom.GetShape() + " " + percent + "%", 4, 0, 0.8f, Color.White);
+                            string s = selRoom.order + "# " + selRoom.ToString() + " " + selRoom.GetShape() + "/" + selRoom.category + "("+selRoom.distanceFromMainPath+") " + percent + "%";
+
+                            if (selRoom.contains!=null)
+                            {
+                                s += "(Contains " + selRoom.contains+")";
+                            }
+
+                            if (selRoom.locked != null)
+                            {
+                                s += "(Requires " + selRoom.locked + ")";
+                            }
+
+                            FontUtils.DrawText(game, s, 4, 0, 0.7f, Color.White);
                         }
                     }
 

@@ -94,6 +94,15 @@ namespace Lunar.Utils
             Split
         }
 
+        public enum RoomCategory
+        {
+            Unknown,
+            Main,
+            Side,
+            Distant,
+            Secret
+        }
+
         public string name;
         private LayoutRoom root;
         public int rank;
@@ -106,6 +115,10 @@ namespace Lunar.Utils
         public LayoutRoom previous;
 
         public RoomKind kind;
+
+
+        public RoomCategory category;
+        public int distanceFromMainPath;
 
         public float intensity;
         public bool spike;
@@ -197,16 +210,21 @@ namespace Lunar.Utils
     {
         public string name;
         public LayoutRoom room;
-        public Color color;
 
-        public float intensity;
+        public float minIntensity;
+        public float maxIntensity;
         public int condition;
 
-        public LayoutKey(string name, Color color)
+        public LayoutKey(string name, float minIntensity, float maxIntensity)
         {
-            this.color = color;
             this.name = name;
-            this.intensity = 1;
+            this.minIntensity = minIntensity;
+            this.minIntensity = maxIntensity;
+        }
+
+        public override string ToString()
+        {
+            return this.name;
         }
     }
 
@@ -354,11 +372,11 @@ namespace Lunar.Utils
         {
             if (entrance == null)
             {
-                //Debug.LogError("Entrance is not set...");
+                Console.WriteLine("Entrance is not set...");
                 return null;
             }
 
-            // find goal room
+            // run dijkstra to find shortest paths 
             List<LayoutRoom> Q = new List<LayoutRoom>();
             foreach (var room in rooms.Values)
             {
@@ -404,6 +422,7 @@ namespace Lunar.Utils
                 }
             }
 
+            // find goal room
             goal = null;
             int maxGoal = 0;
             foreach (var room in rooms.Values)
@@ -439,11 +458,84 @@ namespace Lunar.Utils
 
             goal.kind = LayoutRoom.RoomKind.Goal;
 
+            this.GenerateIntensity();
+
             //Debug.LogWarning("Found goal: " + goal.FloorLevel);
             return goal;
         }
+        
+        /// <summary>
+        /// Selects a category for each room, based if its a main path, a side path, secret path etc
+        /// </summary>
+        private void CategorizeRooms()
+        {
+            // first set any room in the shortest path from entrance to goal as a 'main' room
+            var temp = goal;
+            while (temp != null)
+            {
+                temp.category = LayoutRoom.RoomCategory.Main;
+                temp.distanceFromMainPath = 0;
+                temp = temp.previous;
+            }
 
-        //Kruskals-Minimum-Spanning-Tree
+            foreach (var room in rooms.Values)
+            {
+                if (room.category != LayoutRoom.RoomCategory.Main)
+                {
+                    continue;
+                }
+
+                foreach (var path in room.connections)
+                {
+                    var other = path.roomA == room ? path.roomB : path.roomA;
+
+                    if (other.category == LayoutRoom.RoomCategory.Unknown)
+                    {
+                        FloodAdjacentsWithCategory(other, 1);
+                    }
+                }
+            }
+        }
+
+        private void FloodChildrenWithCategory(LayoutRoom room, int distance)
+        {
+            room.category = LayoutRoom.RoomCategory.Distant;
+            room.distanceFromMainPath = distance;
+
+            foreach (var child in room.children)
+            {
+                FloodChildrenWithCategory(child, distance + 1);
+            }
+        }
+
+        private void FloodAdjacentsWithCategory(LayoutRoom room, int distance)
+        {
+            if (room.connections.Count>2)
+            {
+                FloodChildrenWithCategory(room, distance);
+                return;
+            }
+
+            room.category = LayoutRoom.RoomCategory.Side;
+            room.distanceFromMainPath = distance;
+
+            foreach (var path in room.connections)
+            {
+                var other = path.roomA == room ? path.roomB : path.roomA;
+
+                if (other.category != LayoutRoom.RoomCategory.Unknown)
+                {
+                    continue;
+                }
+
+                FloodAdjacentsWithCategory(other, distance + 1);
+            }
+        }
+
+        /// <summary>
+        /// Runs Kruskals-Minimum-Spanning-Tree on the dungeon network
+        /// </summary>
+        /// <param name="edges"></param>
         private void SolveGraph(List<LayoutConnection> edges)
         {
             int nTotalCost = 0;
@@ -486,7 +578,7 @@ namespace Lunar.Utils
             int currentOrder = 1;
             FindChildrenProgression(ref currentOrder, entrance, new List<LayoutRoom>());
 
-            this.GenerateIntensity();
+            CategorizeRooms();
         }
 
         protected void FindChildrenProgression(ref int currentOrder, LayoutRoom startRoom, List<LayoutRoom> visitedRooms)
@@ -495,17 +587,16 @@ namespace Lunar.Utils
             currentOrder++;
             visitedRooms.Add(startRoom);
 
-            //Debug.Log("Semantic for " + this.Name);
             startRoom.children = new List<LayoutRoom>();
             foreach (var path in startRoom.connections)
             {
-                //Debug.Log("Found connection to " + other.Name + " -> " + other.visited + " order: "+ path.pathOrder);
                 if (path.pathOrder < 0)
                 {
                     continue;
                 }
 
                 var other = path.roomA == startRoom ? path.roomB : path.roomA;
+                //Console.WriteLine("Found connection to " + other.ToString() + " -> " + other.visited + " order: " + path.pathOrder);
 
                 if (!visitedRooms.Contains(other))
                 {
@@ -569,6 +660,11 @@ namespace Lunar.Utils
 
         protected void GenerateIntensity()
         {
+            if (goal == null)
+            {
+                return;
+            }
+
             foreach (var room in rooms.Values)
             {
                 room.intensity = -1;
@@ -596,6 +692,7 @@ namespace Lunar.Utils
             }
         }
 
+        #region LOCKS_AND_KEYS
         protected bool CanBeLocked(LayoutRoom room)
         {
             if (room.parent == null)
@@ -654,7 +751,7 @@ namespace Lunar.Utils
             if (room.locked == null)
             {
                 room.locked = keylock;
-                //Debug.Log("Locked " + this.Name);
+                Console.WriteLine("Locked " + this.ToString());
             }
 
             foreach (var child in room.children)
@@ -685,7 +782,7 @@ namespace Lunar.Utils
                 return;
             }
 
-            //Debug.Log("Testing " + this.Name);
+            Console.WriteLine("Testing " + this.ToString());
             testedRooms.Add(sourceRoom);
 
             if (key.room != null)
@@ -703,7 +800,7 @@ namespace Lunar.Utils
 
                 if (count <= 0)
                 {
-                    //Debug.Log("Placed " + key.name + " in room " + sourceRoom);
+                    Console.WriteLine("Placed " + key.name + " in room " + sourceRoom);
 
                     key.room = sourceRoom;
                     sourceRoom.contains = key;
@@ -782,16 +879,16 @@ namespace Lunar.Utils
                 return;
             }
 
+            if (goal == null)
+            {
+                Console.WriteLine("Goal is not set...");
+                return;
+            }
+
             List<LayoutKey> openKeys = new List<LayoutKey>();
             foreach (LayoutKey key in keys)
             {
                 openKeys.Add(key);
-            }
-
-            if (goal == null)
-            {
-                //Debug.LogError("Goal is not set...");
-                return;
             }
 
             LayoutRoom currentRoom = goal;
@@ -803,12 +900,12 @@ namespace Lunar.Utils
 
                 found = false;
 
-                //Debug.Log("Trying to find lockable room with max intensity " + (int)(maxLockableIntensity * 100));
+                Console.WriteLine("Trying to find lockable room with max intensity " + (int)(maxLockableIntensity * 100));
 
                 LayoutRoom targetRoom = FindLockableRoom(currentRoom, new List<LayoutRoom>(), maxLockableIntensity);
                 if (targetRoom != null)
                 {
-                    //Debug.Log("Found lockable room " + targetRoom.Name);
+                    Console.WriteLine("Found lockable room " + targetRoom.ToString());
                     LayoutKey targetKey = null;
 
                     if (targetRoom.require != null && openKeys.Contains(targetRoom.require))
@@ -823,10 +920,13 @@ namespace Lunar.Utils
 
                     int minKeyDist = 1;
                     int keyDistance = minKeyDist + this.randomGenerator.Next(6 - minKeyDist);
+                    //keyDistance = 20;
                     while (keyDistance >= minKeyDist)
                     {
-                        //Debug.Log("Trying to find room for " + targetKey.name + " at distance " + keyDistance);
+                        Console.WriteLine("Trying to find room for " + targetKey.name + " at distance " + keyDistance);
+
                         PlaceKey(targetRoom.parent, targetKey, targetRoom, new List<LayoutRoom>(), keyDistance, true);
+
                         if (targetKey.room == null)
                         {
                             PlaceKey(targetRoom.parent, targetKey, targetRoom, new List<LayoutRoom>(), keyDistance, false);
@@ -856,7 +956,7 @@ namespace Lunar.Utils
                         else
                         {
                             targetRoom.require = null;
-                            //Debug.Log("Unable to place key " + targetKey.name);
+                            Console.WriteLine("Unable to place key " + targetKey.name);
                         }
 
                         keyDistance--;
@@ -865,7 +965,7 @@ namespace Lunar.Utils
                 }
                 else
                 {
-                    //Debug.Log("Unable to find lockable room");
+                    Console.WriteLine("Unable to find lockable room");
                 }
 
 
@@ -877,7 +977,7 @@ namespace Lunar.Utils
 
             foreach (LayoutKey key in openKeys)
             {
-                //Debug.Log("Key " + key.name + " was not placed...");
+                Console.WriteLine("Key " + key.name + " was not placed...");
             }
 
             // after generating the locks, its now possible to understand which rooms are important and which ones are optional
@@ -918,6 +1018,8 @@ namespace Lunar.Utils
             }
             return -1;
         }
+
+        #endregion
 
         public void GenerateBacktracking(float linearity)
         {

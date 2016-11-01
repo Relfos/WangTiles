@@ -88,9 +88,9 @@ namespace Lunar.Utils
         public enum RoomShape
         {
             Empty,
-            DeadEnd,
             Curve,
             Corridor,
+            Room,
             Split
         }
 
@@ -134,6 +134,7 @@ namespace Lunar.Utils
         public int order;
 
         public int tileID;
+        public int variationID;
 
         public LayoutRoom parent;
         public List<LayoutRoom> children = new List<LayoutRoom>();
@@ -155,11 +156,27 @@ namespace Lunar.Utils
             return this.kind + " ("+ name+")";
         }
 
-        public RoomShape GetShape()
+        public bool isDeadEnd()
         {
             switch (tileID)
+            {
+                case 1: case 2: case 4: case 8: return true;
+                default: return false;
+            }
+        }
+
+
+        public RoomShape GetShape()
+        {
+            if (tileID>0 && variationID == 1)
+            {
+                return RoomShape.Room;
+            }
+
+
+            switch (tileID)
             {                
-                case 1: case 2: case 4: case 8: return RoomShape.DeadEnd;
+                case 1: case 2: case 4: case 8: return RoomShape.Room;
                 case 3: case 6: case 9: case 12: return RoomShape.Curve;
                 case 5: case 10: return RoomShape.Corridor;
                 case 7: case 11: case 13: case 14:  case 15: return RoomShape.Split;
@@ -213,15 +230,13 @@ namespace Lunar.Utils
         public LayoutRoom sourceRoom;
         public LayoutRoom targetRoom;
 
-        public float minIntensity;
-        public float maxIntensity;
+        public int order;
         public int condition;
 
-        public LayoutKey(string name, float minIntensity, float maxIntensity)
+        public LayoutKey(string name, int order)
         {
             this.name = name;
-            this.minIntensity = minIntensity;
-            this.minIntensity = maxIntensity;
+            this.order = order;
         }
 
         public override string ToString()
@@ -342,7 +357,7 @@ namespace Lunar.Utils
                     continue;
                 }
 
-                if (room.GetShape() == LayoutRoom.RoomShape.DeadEnd)
+                if (room.isDeadEnd())
                 {
                     score *= 2;
                 }
@@ -434,7 +449,7 @@ namespace Lunar.Utils
                     continue;
                 }
 
-                if (room.GetShape() != LayoutRoom.RoomShape.DeadEnd)
+                if (!room.isDeadEnd())
                 {
                     continue;
                 }
@@ -458,14 +473,18 @@ namespace Lunar.Utils
                 return null;
             }
 
-            goal.kind = LayoutRoom.RoomKind.Goal;
-
-            this.GenerateIntensity();
-
             //Debug.LogWarning("Found goal: " + goal.FloorLevel);
             return goal;
         }
-        
+
+        public void SetGoal(LayoutRoom goal)
+        {
+            this.goal = goal;
+            goal.kind = LayoutRoom.RoomKind.Goal;
+
+            this.GenerateIntensity();
+        }
+
         /// <summary>
         /// Selects a category for each room, based if its a main path, a side path, secret path etc
         /// </summary>
@@ -512,7 +531,7 @@ namespace Lunar.Utils
 
         private void FloodLoopCategory(LayoutRoom source, LayoutRoom dest)
         {
-            if (source.GetShape() == LayoutRoom.RoomShape.DeadEnd)
+            if (source.isDeadEnd())
             {
                 return;
             }
@@ -745,7 +764,7 @@ namespace Lunar.Utils
         }
 
         #region LOCKS_AND_KEYS
-        protected bool CanBeLocked(LayoutRoom room)
+        /*protected bool CanBeLocked(LayoutRoom room)
         {
             if (room.parent == null)
             {
@@ -761,11 +780,6 @@ namespace Lunar.Utils
             {
                 return false;
             }
-
-            /*if (this.children.Count>2)
-            {
-                return false;
-            }*/
 
             return room.GetShape() != LayoutRoom.RoomShape.DeadEnd;
             //return parent.GetBranchesCount() > 1;
@@ -820,7 +834,7 @@ namespace Lunar.Utils
             }
 
             return (room.kind != LayoutRoom.RoomKind.Goal && room.kind != LayoutRoom.RoomKind.Entrance);
-        }
+        }*/
 
         /*public void PlaceKey(LayoutRoom sourceRoom, LayoutKey key, LayoutRoom targetRoom, List<LayoutRoom> testedRooms, int count, bool deadEndsonly)
         {
@@ -923,7 +937,7 @@ namespace Lunar.Utils
             return false;
         }
 
-        private void FindRoomsForKey(LayoutRoom room, List<LayoutRoom> possibleRooms, List<LayoutRoom> visitedRooms)
+        /*private void FindRoomsForKey(LayoutRoom room, List<LayoutRoom> possibleRooms, List<LayoutRoom> visitedRooms)
         {
             if (visitedRooms.Contains(room))
             {
@@ -931,7 +945,8 @@ namespace Lunar.Utils
             }
             visitedRooms.Add(room);
 
-            if (room.category == LayoutRoom.RoomCategory.Distant && room.GetShape() == LayoutRoom.RoomShape.DeadEnd)
+            var shape = room.GetShape();
+            if (room.category == LayoutRoom.RoomCategory.Distant && (shape == LayoutRoom.RoomShape.DeadEnd || shape == LayoutRoom.RoomShape.Room))
             {
                 possibleRooms.Add(room);
             }
@@ -945,7 +960,7 @@ namespace Lunar.Utils
             {
                 FindRoomsForKey(room.parent, possibleRooms, visitedRooms);
             }
-        }
+        }*/
 
         public void GenerateLocks(List<LayoutKey> keys)
         {
@@ -960,25 +975,53 @@ namespace Lunar.Utils
                 return;
             }
 
+            keys.Sort((x, y) => x.order.CompareTo(y.order));
+
             List<LayoutRoom> possibleLockedRooms = new List<LayoutRoom>();
             List<LayoutRoom> possibleKeyRooms = new List<LayoutRoom>();
             foreach (var room in rooms.Values)
             {
-                if (room.category == LayoutRoom.RoomCategory.Distant && room.GetShape() == LayoutRoom.RoomShape.DeadEnd)
+                if (room == entrance || room == goal)
+                {
+                    continue;
+                }
+
+                if (room.category == LayoutRoom.RoomCategory.Distant && room.GetShape() == LayoutRoom.RoomShape.Room)
                 {
                     possibleKeyRooms.Add(room);
                 }
 
-                if (room.category == LayoutRoom.RoomCategory.Main && !room.isLoop && room.intensity>0.1f && room.intensity<1)
+                if (room.category == LayoutRoom.RoomCategory.Main && !room.isLoop)
                 {
                     possibleLockedRooms.Add(room);
 
                     if (room.require != null)
                     {
                         var key = room.require;
-
                         key.targetRoom = room;                        
                     }
+                }
+            }
+
+            Dictionary<LayoutKey, List<LayoutRoom>> lockableRooms = new Dictionary<LayoutKey, List<LayoutRoom>>();
+            int roomSpread = possibleLockedRooms.Count / keys.Count;
+
+            possibleLockedRooms.Sort((x, y) => x.order.CompareTo(y.order));
+
+            for (int k=0; k<keys.Count; k++)
+            {
+                int startRoom = k * roomSpread;
+                int lastRoom = startRoom + roomSpread - 1;
+                if (lastRoom>=possibleLockedRooms.Count)
+                {
+                    lastRoom = possibleLockedRooms.Count - 1;
+                }
+
+                var key = keys[k];
+                lockableRooms[key] = new List<LayoutRoom>();
+                for (int i=startRoom; i<=lastRoom; i++)
+                {
+                    lockableRooms[key].Add(possibleLockedRooms[i]);
                 }
             }
 
@@ -989,15 +1032,24 @@ namespace Lunar.Utils
                     continue;
                 }
 
-                int n = randomGenerator.Next(possibleLockedRooms.Count);
-                LayoutRoom targetRoom = possibleLockedRooms[n];
-                possibleLockedRooms.Remove(targetRoom);
+                var possibleTargets = lockableRooms[key];
+
+                if (possibleTargets.Count == 0)
+                {
+                    continue;
+                }
+
+                LayoutRoom targetRoom = possibleTargets[randomGenerator.Next(possibleTargets.Count)];
                 key.targetRoom = targetRoom;
             }
 
+            List<LayoutKey> originalKeys = new List<LayoutKey>();
+            foreach (LayoutKey key in keys)
+            {
+                originalKeys.Add(key);
+            }
 
-            keys.Sort((x, y) => y.targetRoom.order.CompareTo(x.targetRoom.order));
-
+            keys.Sort((x, y) => y.order.CompareTo(x.order));
             for (int k=0; k<keys.Count; k++)
             {
                 var key = keys[k];
@@ -1011,7 +1063,6 @@ namespace Lunar.Utils
                 key.targetRoom.locked = key;
 
                 Console.WriteLine("Key '" + key.name + "' used to lock room " + key.targetRoom);
-
 
                 List<LayoutRoom> possibleSources = new List<LayoutRoom>();
                 foreach (var room in possibleKeyRooms)
@@ -1066,7 +1117,7 @@ namespace Lunar.Utils
                 Console.WriteLine("Placed " + key.name + " in room " + sourceRoom);
             }
 
-            foreach (LayoutKey key in keys)
+            foreach (LayoutKey key in originalKeys)
             {
                 if (key.sourceRoom == null)
                 {
@@ -1278,7 +1329,7 @@ namespace Lunar.Utils
 
                     switch (room.GetShape())
                     {
-                        case LayoutRoom.RoomShape.DeadEnd:
+                        case LayoutRoom.RoomShape.Room:
                             {
                                 switch (n)
                                 {

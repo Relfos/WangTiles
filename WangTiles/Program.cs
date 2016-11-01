@@ -64,8 +64,6 @@ namespace WangTiles
         private void DrawTile(byte[] buffer, int bufferWidth, int bufferHeight, int targetX, int targetY, int tileID, int variation, Color borderColor, int drawScale)
         {
             var variations = tiles[tileID];
-
-            variation = variation % variations.Count;
             Bitmap tile = variations[variation];
 
             for (int y = 0; y < _tileSize; y++)
@@ -107,7 +105,9 @@ namespace WangTiles
                 {
                     var tile = map.GetTileAt(i, j);
                     if (tile.tileID < 0) { continue; }
-                    int variation = i + i * j;
+
+                    int variation = tile.variationID;
+
                     DrawTile(buffer, bufferWidth, bufferHeight, i * _tileSize * drawScale, j * _tileSize * drawScale, tile.tileID, variation, drawBorders ? WangUtils.GetAreaColor(tile.areaID) : Color.FromArgb(0), drawScale);
                 }
             }
@@ -219,7 +219,8 @@ namespace WangTiles
             {
                 for (int i = 0; i < map.Width; i++)
                 {
-                    int tileID = map.GetTileAt(i, j).tileID;
+                    var tile = map.GetTileAt(i, j);
+                    int tileID = tile.tileID;
                     if (tileID<=0)
                     {
                         continue;
@@ -235,20 +236,28 @@ namespace WangTiles
 
                     var room = planner.FindRoomAt(new LayoutCoord(i, j));
                     room.tileID = tileID;
-
+                    room.variationID = tile.variationID;
                 }
             }
             planner.entrance = planner.FindRoomAt(new LayoutCoord(exitX, exitY));
             Console.WriteLine("Selected entrance: " + planner.entrance);
 
             var goal = planner.FindGoal();
+
+            goal = goal.previous;
+            while (goal.GetShape() == LayoutRoom.RoomShape.Corridor)
+            {
+                goal = goal.previous;
+            }
+
+            planner.SetGoal(goal);
             Console.WriteLine("Selected goal: " + goal);
 
             List<LayoutKey> keys = new List<LayoutKey>();
-            keys.Add(new LayoutKey("Copper", 0, 1));
-            keys.Add(new LayoutKey("Bronze", 0, 1));
-            keys.Add(new LayoutKey("Silver", 0, 1));
-            keys.Add(new LayoutKey("Gold", 0, 1));
+            //keys.Add(new LayoutKey("Copper", 0));
+            //keys.Add(new LayoutKey("Bronze", 1));
+            keys.Add(new LayoutKey("Silver", 2));
+            keys.Add(new LayoutKey("Gold", 3));
 
             planner.GenerateProgression();
             planner.GenerateRoomTypes();

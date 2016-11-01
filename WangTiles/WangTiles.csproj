@@ -50,6 +50,7 @@
   <ItemGroup>
     <Compile Include="DungeonPlanner.cs" />
     <Compile Include="FontUtils.cs" />
+    <Compile Include="MathUtility.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="WangUtils.cs" />

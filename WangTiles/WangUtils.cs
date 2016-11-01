@@ -149,6 +149,7 @@ namespace Lunar.Utils
     public struct WangTile
     {
         public int tileID;
+        public int variationID;
         public WangArea areaID;
     }
 
@@ -351,9 +352,25 @@ namespace Lunar.Utils
             return x + y * _width;
         }
 
-        public void SetTileAt(int x, int y, int val)
+        public void SetTileIDAt(int x, int y, int val)
         {
-            tiles[GetTileOffset(x, y)].tileID = val;
+            int ofs = GetTileOffset(x, y);
+            tiles[ofs].tileID = val;
+
+            int n = (x * y) + (x | y);
+            int variation;
+            switch (val)
+            {
+                case 0: variation = 0; break;
+                case 1: case 2: case 4: case 8: case 15: variation = n % 3; break;
+                case 3: case 6: case 9: case 12: variation = n % 3; break;
+                case 5: case 10: variation = n % 4; break;
+
+                default: variation = n % 3; break;
+            }
+
+            
+            tiles[ofs].variationID = variation;
         }
 
         private void FloodFillArea(int x, int y, WangArea areaID)
@@ -518,7 +535,7 @@ namespace Lunar.Utils
                 {
                     if (GetTileAt(i, j).areaID == area)
                     {
-                        SetTileAt(i, j, 0);
+                        SetTileIDAt(i, j, 0);
                     }
                 }
             }
@@ -536,7 +553,7 @@ namespace Lunar.Utils
                         continue;
                     }
 
-                    SetTileAt(i, j, 15 - current);
+                    SetTileIDAt(i, j, 15 - current);
                 }
             }
         }
@@ -567,7 +584,7 @@ namespace Lunar.Utils
             }
 
             int n = matches[rnd.Next(matches.Count)];
-            SetTileAt(i, j, n);
+            SetTileIDAt(i, j, n);
         }
 
     }

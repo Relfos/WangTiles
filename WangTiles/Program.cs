@@ -368,9 +368,12 @@ namespace WangTiles
 
                     if (selX>=0 && selY >=0)
                     {
-                        var selRoom = planner.FindRoomAt(new LayoutCoord(selX, selY));
-                        int percent = ((int)(selRoom.intensity * 100));
-                        FontUtils.DrawText(game, selRoom.order+"# "+ selRoom.ToString() + " "+selRoom.GetShape() + " " + percent +"%", 4, 0, 0.8f, Color.White);
+                        var selRoom = planner.FindRoomAt(new LayoutCoord(selX, selY), false);
+                        if (selRoom!=null)
+                        {
+                            int percent = ((int)(selRoom.intensity * 100));
+                            FontUtils.DrawText(game, selRoom.order + "# " + selRoom.ToString() + " " + selRoom.GetShape() + " " + percent + "%", 4, 0, 0.8f, Color.White);
+                        }
                     }
 
                     game.SwapBuffers();

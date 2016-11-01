@@ -274,11 +274,16 @@ namespace Lunar.Utils
             return conn;
         }
 
-        public LayoutRoom FindRoomAt(LayoutCoord coord)
+        public LayoutRoom FindRoomAt(LayoutCoord coord, bool canCreate = true)
         {
             if (rooms.ContainsKey(coord))
             {
                 return rooms[coord];
+            }
+
+            if (!canCreate)
+            {
+                return null;
             }
 
             var room = new LayoutRoom(coord);

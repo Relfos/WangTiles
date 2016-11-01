@@ -44,10 +44,47 @@ namespace Lunar.Utils
             this.roomA = roomA;
             this.roomB = roomB;
         }
+
+        public static void QuickSort(List<LayoutConnection> edgesList, int nLeft, int nRight)
+        {
+            int i, j, x;
+            i = nLeft; j = nRight;
+            x = edgesList[(nLeft + nRight) / 2].weight;
+
+            do
+            {
+                while ((edgesList[i].weight < x) && (i < nRight)) i++;
+                while ((x < edgesList[j].weight) && (j > nLeft)) j--;
+
+                if (i <= j)
+                {
+                    LayoutConnection y = edgesList[i];
+                    edgesList[i] = edgesList[j];
+                    edgesList[j] = y;
+                    i++; j--;
+                }
+            } while (i <= j);
+
+            if (nLeft < j) QuickSort(edgesList, nLeft, j);
+            if (i < nRight) QuickSort(edgesList, i, nRight);
+        }
     }
 
     public class LayoutRoom
     {
+        public enum RoomKind
+        {
+            Invalid,
+            Entrance,
+            Hall,
+            Puzzle,
+            Monster,
+            Farm,
+            Shrine,
+            Treasure,
+            Goal
+        }
+
         public string name;
         private LayoutRoom root;
         public int rank;
@@ -157,18 +194,6 @@ namespace Lunar.Utils
         }
     }
 
-    public enum RoomKind
-    {
-        Invalid,
-        Entrance,
-        Hall,
-        Puzzle,
-        Monster,
-        Farm,
-        Shrine,
-        Treasure,
-        Goal
-    }
 
     public class LayoutPlanner
     {
@@ -177,9 +202,8 @@ namespace Lunar.Utils
         public LayoutRoom entrance;
         public LayoutRoom goal;
 
-        public List<LayoutConnection> connections;
+        public List<LayoutConnection> connections = new List<LayoutConnection>();
         private Dictionary<LayoutCoord, LayoutRoom> rooms = new Dictionary<LayoutCoord, LayoutRoom>();
-        //private Dictionary<LayoutRoom, RoomInfo> roomInfo = new Dictionary<LayoutRoom, RoomInfo>();
 
         public LayoutPlanner(int seed)
         {
@@ -190,6 +214,7 @@ namespace Lunar.Utils
             this.randomGenerator = new Random(seed);
         }
 
+        #region LAYOUT_SETUP
         public LayoutRoom AddRoom(LayoutCoord coord, int tileID)
         {
             var room = FindRoomAt(coord);
@@ -234,6 +259,9 @@ namespace Lunar.Utils
             conn = new LayoutConnection(roomA, roomB, this.randomGenerator);
             roomA.connections.Add(conn);
             roomB.connections.Add(conn);
+
+            this.connections.Add(conn);
+
             return conn;
         }
 
@@ -248,6 +276,7 @@ namespace Lunar.Utils
             rooms[coord] = room;
             return room;
         }
+        #endregion
 
         public struct RoomScore
         {
@@ -301,7 +330,7 @@ namespace Lunar.Utils
 
             entrance = temp[randomGenerator.Next((temp.Count < 3 ? temp.Count : 3))].room;
 
-            entrance.kind = RoomKind.Entrance;
+            entrance.kind = LayoutRoom.RoomKind.Entrance;
             
             return entrance;
         }
@@ -394,15 +423,52 @@ namespace Lunar.Utils
                 return null;
             }
 
-            goal.kind = RoomKind.Goal;
+            goal.kind = LayoutRoom.RoomKind.Goal;
 
             //UpdateRoomNames();
             //Debug.LogWarning("Found goal: " + goal.FloorLevel);
             return goal;
         }
 
+        //Kruskals-Minimum-Spanning-Tree
+        private void SolveGraph(List<LayoutConnection> edges)
+        {
+            int nTotalCost = 0;
+            int currentOrder = 0;
+
+            if (edges.Count <= 0)
+            {
+                return;
+            }
+
+            LayoutConnection.QuickSort(edges, 0, edges.Count - 1);
+            foreach (var ed in edges)
+            {
+                if (!ed.active)
+                {
+                    continue;
+                }
+
+                LayoutRoom vRoot1, vRoot2;
+                vRoot1 = ed.roomA.GetRoot();
+                vRoot2 = ed.roomB.GetRoot();
+
+                if (vRoot1 != vRoot2)
+                {
+                    nTotalCost += ed.weight;
+                    LayoutRoom.Join(vRoot1, vRoot2);
+
+                    ed.pathOrder = currentOrder;
+                    ed.active = true;
+                    currentOrder++;
+                }
+            }
+        }
+
         public void GenerateProgression()
         {
+            this.SolveGraph(this.connections);
+
             // generate dungeon semantic tree (which represents the logical progression inside the dungeon)
             int currentOrder = 1;
             FindChildrenProgression(ref currentOrder, entrance, new List<LayoutRoom>());
@@ -446,7 +512,7 @@ namespace Lunar.Utils
 
             room.spike = false;
 
-            if (room.kind == RoomKind.Goal)
+            if (room.kind == LayoutRoom.RoomKind.Goal)
             {
                 value += 3;
                 room.spike = true;
@@ -468,7 +534,7 @@ namespace Lunar.Utils
                     value += 0.2f;
                 }
 
-                if (room.kind == RoomKind.Treasure)
+                if (room.kind == LayoutRoom.RoomKind.Treasure)
                 {
                     value += 0.5f;
                     room.spike = true;
@@ -530,7 +596,7 @@ namespace Lunar.Utils
                 return false;
             }
 
-            if (room.kind == RoomKind.Entrance)
+            if (room.kind == LayoutRoom.RoomKind.Entrance)
             {
                 return false;
             }
@@ -592,7 +658,7 @@ namespace Lunar.Utils
                 return false;
             }
 
-            return (room.kind != RoomKind.Goal && room.kind != RoomKind.Entrance);
+            return (room.kind != LayoutRoom.RoomKind.Goal && room.kind != LayoutRoom.RoomKind.Entrance);
         }
 
         public void PlaceKey(LayoutRoom sourceRoom, LayoutKey key, LayoutRoom targetRoom, List<LayoutRoom> testedRooms, int count, bool deadEndsonly)
@@ -818,11 +884,11 @@ namespace Lunar.Utils
                     int n = this.randomGenerator.Next(8);
                     if (n > 2)
                     {
-                        room.kind = RoomKind.Puzzle;
+                        room.kind = LayoutRoom.RoomKind.Puzzle;
                     }
                     else
                     {
-                        room.kind = RoomKind.Treasure;
+                        room.kind = LayoutRoom.RoomKind.Treasure;
                     }
 
                 }
@@ -870,6 +936,7 @@ namespace Lunar.Utils
                 }
             }
         }
+
         public void GenerateRoomTypes()
         {
             for (int i = 0; i <= 5; i++)
@@ -881,15 +948,15 @@ namespace Lunar.Utils
             // generate monster rooms
             foreach (var room in rooms.Values)
             {
-                if (room.kind == RoomKind.Treasure)
+                if (room.kind == LayoutRoom.RoomKind.Treasure)
                 {
                     int n = this.randomGenerator.Next(6);
 
                     switch (n)
                     {
-                        case 0: room.kind = RoomKind.Shrine; break;
-                        case 1: room.kind = RoomKind.Farm; break;
-                        default: room.kind = RoomKind.Monster; break;
+                        case 0: room.kind = LayoutRoom.RoomKind.Shrine; break;
+                        case 1: room.kind = LayoutRoom.RoomKind.Farm; break;
+                        default: room.kind = LayoutRoom.RoomKind.Monster; break;
                     }
                 }
             }

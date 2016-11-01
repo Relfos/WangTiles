@@ -203,15 +203,17 @@ namespace WangTiles
             }
 
 
-            var map = new WangMap(14, 9, 3424);
-
             int exitX = 1;
             int exitY = -1;
 
+            #region WANG_GENERATION
+            var map = new WangMap(14, 9, 3424);
             map.AddExit(exitX, exitY);
             map.Generate();
             map.FixConnectivity();
+            #endregion
 
+            #region DUNGEON_PLANNING
             LayoutPlanner planner = new LayoutPlanner(4343);
             for (int j=0; j<map.Height; j++)
             {
@@ -231,6 +233,10 @@ namespace WangTiles
 
             var goal = planner.FindGoal();
             Console.WriteLine("Selected goal: " + goal);
+
+            planner.GenerateProgression();
+            #endregion
+
 
             // now render the map to a pixel array
             int currentTileset = 0;
@@ -352,7 +358,7 @@ namespace WangTiles
                     if (selX>=0 && selY >=0)
                     {
                         var selRoom = planner.FindRoomAt(new LayoutCoord(selX, selY));
-                        FontUtils.DrawText(game,  selRoom.ToString(), 4, 0, 1, Color.White);
+                        FontUtils.DrawText(game, selRoom.order+"# "+ selRoom.ToString(), 4, 0, 1, Color.White);
                     }
 
                     game.SwapBuffers();

@@ -245,7 +245,10 @@ namespace WangTiles
             Console.WriteLine("Selected goal: " + goal);
 
             List<LayoutKey> keys = new List<LayoutKey>();
-            keys.Add(new LayoutKey("Test Key", 0, 1));
+            keys.Add(new LayoutKey("Copper", 0, 1));
+            keys.Add(new LayoutKey("Bronze", 0, 1));
+            keys.Add(new LayoutKey("Silver", 0, 1));
+            keys.Add(new LayoutKey("Gold", 0, 1));
 
             planner.GenerateProgression();
             planner.GenerateRoomTypes();
@@ -376,7 +379,8 @@ namespace WangTiles
                         if (selRoom!=null)
                         {
                             int percent = ((int)(selRoom.intensity * 100));
-                            string s = selRoom.order + "# " + selRoom.ToString() + " " + selRoom.GetShape() + "/" + selRoom.category + "("+selRoom.distanceFromMainPath+") " + percent + "%";
+                            string s = selRoom.order + "# " + selRoom.ToString();
+                            string s2 = selRoom.GetShape() + "/" + selRoom.category + "("+selRoom.distanceFromMainPath+") " + percent + "%";
 
                             if (selRoom.contains!=null)
                             {
@@ -388,7 +392,13 @@ namespace WangTiles
                                 s += "(Requires " + selRoom.locked + ")";
                             }
 
-                            FontUtils.DrawText(game, s, 4, 0, 0.7f, Color.White);
+                            if (selRoom.isLoop)
+                            {
+                                s += "(Loop)";
+                            }
+
+                            FontUtils.DrawText(game, s, 4, 20, 0.6f, Color.White);
+                            FontUtils.DrawText(game, s2, 4, 0, 0.6f, Color.White);
                         }
                     }
 

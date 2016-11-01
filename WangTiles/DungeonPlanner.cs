@@ -85,6 +85,15 @@ namespace Lunar.Utils
             Goal
         }
 
+        public enum RoomShape
+        {
+            Empty,
+            DeadEnd,
+            Curve,
+            Corridor,
+            Split
+        }
+
         public string name;
         private LayoutRoom root;
         public int rank;
@@ -132,9 +141,16 @@ namespace Lunar.Utils
             return this.kind + " ("+ name+")";
         }
 
-        public bool IsDeadEnd()
+        public RoomShape GetShape()
         {
-            return tileID<5;
+            switch (tileID)
+            {                
+                case 1: case 2: case 4: case 8: return RoomShape.DeadEnd;
+                case 3: case 6: case 9: case 12: return RoomShape.Curve;
+                case 5: case 10: return RoomShape.Corridor;
+                case 7: case 11: case 13: case 14:  case 15: return RoomShape.Split;
+                default: return RoomShape.Empty;
+            }
         }
 
         internal LayoutRoom GetRoot()
@@ -215,13 +231,6 @@ namespace Lunar.Utils
         }
 
         #region LAYOUT_SETUP
-        public LayoutRoom AddRoom(LayoutCoord coord, int tileID)
-        {
-            var room = FindRoomAt(coord);
-            room.tileID = tileID;
-            return room;
-        }
-
         public LayoutConnection AddConnection(LayoutCoord a, LayoutCoord b)
         {
             return AddConnection(FindRoomAt(a), FindRoomAt(b));
@@ -308,7 +317,7 @@ namespace Lunar.Utils
                     continue;
                 }
 
-                if (room.IsDeadEnd())
+                if (room.GetShape() == LayoutRoom.RoomShape.DeadEnd)
                 {
                     score *= 2;
                 }
@@ -399,7 +408,7 @@ namespace Lunar.Utils
                     continue;
                 }
 
-                if (!room.IsDeadEnd())
+                if (room.GetShape() != LayoutRoom.RoomShape.DeadEnd)
                 {
                     continue;
                 }
@@ -425,7 +434,6 @@ namespace Lunar.Utils
 
             goal.kind = LayoutRoom.RoomKind.Goal;
 
-            //UpdateRoomNames();
             //Debug.LogWarning("Found goal: " + goal.FloorLevel);
             return goal;
         }
@@ -514,14 +522,14 @@ namespace Lunar.Utils
 
             if (room.kind == LayoutRoom.RoomKind.Goal)
             {
-                value += 3;
+                value += 1.5f;
                 room.spike = true;
             }
             else
             {
                 if (room.contains != null)
                 {
-                    value += 1.5f;
+                    value += 1.25f;
                     room.spike = true;
                 }
                 else
@@ -531,7 +539,7 @@ namespace Lunar.Utils
                 }
                 else
                 {
-                    value += 0.2f;
+                    value += 0.25f;
                 }
 
                 if (room.kind == LayoutRoom.RoomKind.Treasure)
@@ -573,7 +581,6 @@ namespace Lunar.Utils
                 }
             }
 
-            max += 1;
             goal.intensity = max;
             
             // normalize intensities
@@ -606,7 +613,7 @@ namespace Lunar.Utils
                 return false;
             }*/
 
-            return !room.IsDeadEnd();
+            return room.GetShape() != LayoutRoom.RoomShape.DeadEnd;
             //return parent.GetBranchesCount() > 1;
         }
 
@@ -653,7 +660,7 @@ namespace Lunar.Utils
 
         public bool CanPlaceKey(LayoutRoom room, bool deadEndsonly)
         {
-            if (deadEndsonly && !room.IsDeadEnd())
+            if (deadEndsonly && room.GetShape() != LayoutRoom.RoomShape.DeadEnd)
             {
                 return false;
             }
@@ -896,8 +903,6 @@ namespace Lunar.Utils
 
             // generate intensity for rooms based on tension curve 
             GenerateIntensity();
-
-            //UpdateRoomNames();
         }
 
         protected int GetRoomCondition(LayoutRoom room)
@@ -939,29 +944,68 @@ namespace Lunar.Utils
 
         public void GenerateRoomTypes()
         {
-            for (int i = 0; i <= 5; i++)
-            {
-                // re-generate intensity 
-                this.GenerateIntensity();
-            }
+            // re-generate intensity 
+            this.GenerateIntensity();
 
             // generate monster rooms
             foreach (var room in rooms.Values)
             {
-                if (room.kind == LayoutRoom.RoomKind.Treasure)
+                if (room.kind == LayoutRoom.RoomKind.Hall)
                 {
                     int n = this.randomGenerator.Next(6);
 
-                    switch (n)
+                    switch (room.GetShape())
                     {
-                        case 0: room.kind = LayoutRoom.RoomKind.Shrine; break;
-                        case 1: room.kind = LayoutRoom.RoomKind.Farm; break;
-                        default: room.kind = LayoutRoom.RoomKind.Monster; break;
+                        case LayoutRoom.RoomShape.DeadEnd:
+                            {
+                                switch (n)
+                                {
+                                    case 0: room.kind = LayoutRoom.RoomKind.Shrine; break;
+                                    case 1: room.kind = LayoutRoom.RoomKind.Farm; break;
+                                    case 2: room.kind = LayoutRoom.RoomKind.Puzzle; break;
+                                    default: room.kind = LayoutRoom.RoomKind.Treasure; break;
+                                }
+                                break;
+                            }
+
+                        case LayoutRoom.RoomShape.Curve:
+                            {
+                                switch (n)
+                                {
+                                    case 0: room.kind = LayoutRoom.RoomKind.Puzzle; break;
+                                    case 1: room.kind = LayoutRoom.RoomKind.Monster; break;
+                                }
+                                break;
+                            }
+
+                        case LayoutRoom.RoomShape.Split:
+                            {
+                                switch (n)
+                                {
+                                    case 0: room.kind = LayoutRoom.RoomKind.Puzzle; break;
+                                    case 2: room.kind = LayoutRoom.RoomKind.Monster; break;
+                                    case 3: room.kind = LayoutRoom.RoomKind.Shrine; break;
+                                    case 4: room.kind = LayoutRoom.RoomKind.Farm; break;
+                                }
+                                break;
+                            }
+
+                        case LayoutRoom.RoomShape.Corridor:
+                            {
+                                switch (n)
+                                {
+                                    case 0: room.kind = LayoutRoom.RoomKind.Monster; break;
+                                }
+                                break;
+                            }
+
                     }
+
                 }
             }
 
-            //UpdateRoomNames();
+            // re-generate intensity 
+            this.GenerateIntensity();
         }
 
     }

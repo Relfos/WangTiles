@@ -219,13 +219,23 @@ namespace WangTiles
             {
                 for (int i = 0; i < map.Width; i++)
                 {
+                    int tileID = map.GetTileAt(i, j).tileID;
+                    if (tileID<=0)
+                    {
+                        continue;
+                    }
+
                     bool north, south, east, west;
-                    WangUtils.GetConnectionsForTile(map.GetTileAt(i, j).tileID, out north, out east, out south, out west);
+                    WangUtils.GetConnectionsForTile(tileID, out north, out east, out south, out west);
 
                     if (north) { planner.AddConnection(new LayoutCoord(i, j), WangDirection.North); }
                     if (south) { planner.AddConnection(new LayoutCoord(i, j), WangDirection.South); }
                     if (east) { planner.AddConnection(new LayoutCoord(i, j), WangDirection.East); }
                     if (west) { planner.AddConnection(new LayoutCoord(i, j), WangDirection.West); }
+
+                    var room = planner.FindRoomAt(new LayoutCoord(i, j));
+                    room.tileID = tileID;
+
                 }
             }
             planner.entrance = planner.FindRoomAt(new LayoutCoord(exitX, exitY));
@@ -235,6 +245,7 @@ namespace WangTiles
             Console.WriteLine("Selected goal: " + goal);
 
             planner.GenerateProgression();
+            planner.GenerateRoomTypes();
             #endregion
 
 
@@ -358,7 +369,8 @@ namespace WangTiles
                     if (selX>=0 && selY >=0)
                     {
                         var selRoom = planner.FindRoomAt(new LayoutCoord(selX, selY));
-                        FontUtils.DrawText(game, selRoom.order+"# "+ selRoom.ToString(), 4, 0, 1, Color.White);
+                        int percent = ((int)(selRoom.intensity * 100));
+                        FontUtils.DrawText(game, selRoom.order+"# "+ selRoom.ToString() + " "+selRoom.GetShape() + " " + percent +"%", 4, 0, 0.8f, Color.White);
                     }
 
                     game.SwapBuffers();

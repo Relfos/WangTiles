@@ -962,6 +962,11 @@ namespace Lunar.Utils
             }
         }*/
 
+        private bool isValidKeyRoom(LayoutRoom room)
+        {
+            return room.category == LayoutRoom.RoomCategory.Distant && room.GetShape() == LayoutRoom.RoomShape.Room;
+        }
+
         public void GenerateLocks(List<LayoutKey> keys)
         {
             if (keys == null || keys.Count <= 0)
@@ -977,6 +982,15 @@ namespace Lunar.Utils
 
             keys.Sort((x, y) => x.order.CompareTo(y.order));
 
+            int firstKeyRoom = rooms.Count + 1;
+            foreach (var room in rooms.Values)
+            {
+                if (isValidKeyRoom(room) && room.order < firstKeyRoom)
+                {
+                    firstKeyRoom = room.order;
+                }
+            }
+
             List<LayoutRoom> possibleLockedRooms = new List<LayoutRoom>();
             List<LayoutRoom> possibleKeyRooms = new List<LayoutRoom>();
             foreach (var room in rooms.Values)
@@ -986,12 +1000,12 @@ namespace Lunar.Utils
                     continue;
                 }
 
-                if (room.category == LayoutRoom.RoomCategory.Distant && room.GetShape() == LayoutRoom.RoomShape.Room)
+                if (isValidKeyRoom(room))
                 {
                     possibleKeyRooms.Add(room);
                 }
 
-                if (room.category == LayoutRoom.RoomCategory.Main && !room.isLoop)
+                if (room.category == LayoutRoom.RoomCategory.Main && !room.isLoop && room.order > firstKeyRoom)
                 {
                     possibleLockedRooms.Add(room);
 

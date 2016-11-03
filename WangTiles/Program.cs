@@ -254,8 +254,8 @@ namespace WangTiles
             Console.WriteLine("Selected goal: " + goal);
 
             List<LayoutKey> keys = new List<LayoutKey>();
-            //keys.Add(new LayoutKey("Copper", 0));
-            //keys.Add(new LayoutKey("Bronze", 1));
+            keys.Add(new LayoutKey("Copper", 0));
+            keys.Add(new LayoutKey("Bronze", 1));
             keys.Add(new LayoutKey("Silver", 2));
             keys.Add(new LayoutKey("Gold", 3));
 

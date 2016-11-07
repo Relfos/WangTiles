@@ -362,9 +362,10 @@ namespace Lunar.Utils
             switch (val)
             {
                 case 0: variation = 0; break;
-                case 1: case 2: case 4: case 8: case 15: variation = n % 3; break;
+                case 1: case 2: case 4: case 8: variation = n % 3; break;
                 case 3: case 6: case 9: case 12: variation = n % 3; break;
                 case 5: case 10: variation = n % 4; break;
+                case 15: variation = n % 2; break;
 
                 default: variation = n % 3; break;
             }
@@ -440,10 +441,10 @@ namespace Lunar.Utils
                     //Console.WriteLine("Joined " + GetAreaColor(area) + " to " + GetAreaColor(temp.Key));
 
                     int ofs = GetTileOffset(tile.x1, tile.y1);
-                    this.tiles[ofs].tileID = WangUtils.AddConnection(this.tiles[ofs].tileID, tile.exit);
+                    SetTileIDAt(tile.x1, tile.y1, WangUtils.AddConnection(this.tiles[ofs].tileID, tile.exit));
 
                     ofs = GetTileOffset(tile.x2, tile.y2);
-                    this.tiles[ofs].tileID = WangUtils.AddConnection(this.tiles[ofs].tileID, WangUtils.InvertDirection(tile.exit));
+                    SetTileIDAt(tile.x2, tile.y2, WangUtils.AddConnection(this.tiles[ofs].tileID, WangUtils.InvertDirection(tile.exit)));
                 }
             }
 

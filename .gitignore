@@ -2,3 +2,9 @@ WangTiles/bin/Debug/
 WangTiles/obj/
 packages/
 .vs/
+DungeonGenDemo/bin/Debug/
+TerrainGenDemo/bin/Debug/
+WangTileLib/bin/
+WangTileLib/obj/
+TerrainGenDemo/obj/
+DungeonGenDemo/obj/

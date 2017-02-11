@@ -5,11 +5,12 @@ using OpenTK.Input;
 using System.Drawing;
 using System.Net;
 using WangTiles.Utils;
+using WangTiles.DungeonPlanner;
 using WangTiles.Core;
 
-namespace WangTiles
+namespace DungeonDemo
 {
-    public class LayoutGenExample
+    public class DungeonExample
     {
         #region TEXTURE_BUFFER_UTILS
         private static int bufferWidth = 600;
@@ -60,27 +61,6 @@ namespace WangTiles
         }
         #endregion
 
-
-
-        private static void DownloadTileset(string name)
-        {
-            using (var client = new WebClient())
-            {
-                Bitmap target = new Bitmap(512, 32);
-                for (int i = 0; i < 16; i++)
-                {
-                    var url = "http://s358455341.websitehome.co.uk/stagecast/art/edge/" + name + "/" + i + ".gif";
-                    var tempName = "temp" + i + ".gif";
-                    client.DownloadFile(url, tempName);
-                    Bitmap temp = new Bitmap(tempName);
-                    Graphics g = Graphics.FromImage(target);
-                    g.DrawImage(temp, i * 32, 0);
-                }
-                target.Save("tileset.png");
-            }
-        }
-
-
         public static void Main(string[] args)
         {
             //DownloadTileset("walkway");
@@ -88,14 +68,7 @@ namespace WangTiles
             bool drawBorders = false;
             int drawScale = 4;
 
-            var tilesets = new List<Tileset>();
-            // load tilesets
-            for (int i=0; i<=9; i++)
-            {
-                var tileset = new Tileset("../data/tileset"+i+".png");
-                tilesets.Add(tileset);
-            }
-
+            var tileset = new Tileset("../data/tileset0.png");
 
             int exitX = 1;
             int exitY = -1;
@@ -107,10 +80,60 @@ namespace WangTiles
             map.FixConnectivity();
             #endregion
 
+            #region DUNGEON_PLANNING
+            LayoutPlanner planner = new LayoutPlanner(4343);
+            for (int j = 0; j < map.Height; j++)
+            {
+                for (int i = 0; i < map.Width; i++)
+                {
+                    var tile = map.GetTileAt(i, j);
+                    int tileID = tile.tileID;
+                    if (tileID <= 0)
+                    {
+                        continue;
+                    }
+
+                    bool north, south, east, west;
+                    WangEdgeUtils.GetConnectionsForTile(tileID, out north, out east, out south, out west);
+
+                    if (north) { planner.AddConnection(new LayoutCoord(i, j), WangEdgeDirection.North); }
+                    if (south) { planner.AddConnection(new LayoutCoord(i, j), WangEdgeDirection.South); }
+                    if (east) { planner.AddConnection(new LayoutCoord(i, j), WangEdgeDirection.East); }
+                    if (west) { planner.AddConnection(new LayoutCoord(i, j), WangEdgeDirection.West); }
+
+                    var room = planner.FindRoomAt(new LayoutCoord(i, j));
+                    room.tileID = tileID;
+                    room.variationID = tile.variationID;
+                }
+            }
+            planner.entrance = planner.FindRoomAt(new LayoutCoord(exitX, exitY));
+            Console.WriteLine("Selected entrance: " + planner.entrance);
+
+            var goal = planner.FindGoal();
+
+            goal = goal.previous;
+            while (goal.GetShape() == LayoutRoom.RoomShape.Corridor)
+            {
+                goal = goal.previous;
+            }
+
+            planner.SetGoal(goal);
+            Console.WriteLine("Selected goal: " + goal);
+
+            List<LayoutKey> keys = new List<LayoutKey>();
+            keys.Add(new LayoutKey("Copper", 0));
+            keys.Add(new LayoutKey("Bronze", 1));
+            keys.Add(new LayoutKey("Silver", 2));
+            keys.Add(new LayoutKey("Gold", 3));
+
+            planner.GenerateProgression();
+            planner.GenerateRoomTypes();
+            planner.GenerateLocks(keys);
+            #endregion
+
 
             // now render the map to a pixel array
-            int currentTileset = 0;
-            tilesets[currentTileset].RedrawWithTileset(buffer, bufferWidth, bufferHeight, map, drawBorders, drawScale);
+            tileset.RedrawWithTileset(buffer, bufferWidth, bufferHeight, map, drawBorders, drawScale);
 
 
             int bufferTexID = 0;
@@ -145,8 +168,8 @@ namespace WangTiles
 
                     //Console.WriteLine(mousePos.X + "    " + mousePos.Y);
 
-                    selX = (mousePos.X) / (drawScale * tilesets[currentTileset].TileSize);
-                    selY = (mousePos.Y) / (drawScale * tilesets[currentTileset].TileSize);
+                    selX = (mousePos.X) / (drawScale * tileset.TileSize);
+                    selY = (mousePos.Y) / (drawScale * tileset.TileSize);
 
                     if (selX >= map.Width) { selX = -1; }
                     if (selY >= map.Height) { selY = -1; }
@@ -163,52 +186,6 @@ namespace WangTiles
                         Environment.Exit(0);
                     }
 
-                    int oldTileset = currentTileset;
-                    if (game.Keyboard[Key.Number1])
-                    {
-                        currentTileset = 0;
-                    }
-                    if (game.Keyboard[Key.Number2])
-                    {
-                        currentTileset = 1;
-                    }
-                    if (game.Keyboard[Key.Number3])
-                    {
-                        currentTileset = 2;
-                    }
-                    if (game.Keyboard[Key.Number4])
-                    {
-                        currentTileset = 3;
-                    }
-                    if (game.Keyboard[Key.Number5])
-                    {
-                        currentTileset = 4;
-                    }
-                    if (game.Keyboard[Key.Number6])
-                    {
-                        currentTileset = 5;
-                    }
-
-                    if (game.Keyboard[Key.Number7])
-                    {
-                        currentTileset = 6;
-                    }
-
-                    if (game.Keyboard[Key.Number8])
-                    {
-                        currentTileset = 7;
-                    }
-
-                    if (game.Keyboard[Key.Number9])
-                    {
-                        currentTileset = 8;
-                    }
-
-                    if (oldTileset != currentTileset)
-                    {
-                        tilesets[currentTileset].RedrawWithTileset(buffer, bufferWidth, bufferHeight, map, drawBorders, drawScale);
-                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
-                    }
                 };
 
 
@@ -224,6 +201,35 @@ namespace WangTiles
                     // draw the texture to the screen, stretched to fill the whole window
                     DrawBuffer(game, bufferTexID);
 
+
+                    if (selX >= 0 && selY >= 0)
+                    {
+                        var selRoom = planner.FindRoomAt(new LayoutCoord(selX, selY), false);
+                        if (selRoom != null)
+                        {
+                            int percent = ((int)(selRoom.intensity * 100));
+                            string s = selRoom.order + "# " + selRoom.ToString();
+                            string s2 = selRoom.GetShape() + "/" + selRoom.category + "(" + selRoom.distanceFromMainPath + ") " + percent + "%";
+
+                            if (selRoom.contains != null)
+                            {
+                                s += "(Contains " + selRoom.contains + ")";
+                            }
+
+                            if (selRoom.locked != null)
+                            {
+                                s += "(Requires " + selRoom.locked + ")";
+                            }
+
+                            if (selRoom.isLoop)
+                            {
+                                s += "(Loop)";
+                            }
+
+                            FontUtils.DrawText(game, s, 4, 20, 0.6f, Color.White);
+                            FontUtils.DrawText(game, s2, 4, 0, 0.6f, Color.White);
+                        }
+                    }
 
                     game.SwapBuffers();
                 };

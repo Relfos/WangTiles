@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Drawing;
 
-namespace Lunar.Utils
+using WangTiles.Core;
+
+namespace WangTiles.DungeonPlanner
 {
     public struct LayoutCoord
     {
@@ -271,16 +272,16 @@ namespace Lunar.Utils
             return AddConnection(FindRoomAt(a), FindRoomAt(b));
         }
 
-        public LayoutConnection AddConnection(LayoutCoord a, WangDirection dir)
+        public LayoutConnection AddConnection(LayoutCoord a, WangEdgeDirection dir)
         {
             LayoutCoord b;
             
             switch (dir)
             {
-                case WangDirection.East: b = new LayoutCoord(a.X + 1, a.Y); break;
-                case WangDirection.West: b = new LayoutCoord(a.X - 1, a.Y); break;
-                case WangDirection.North: b = new LayoutCoord(a.X, a.Y - 1); break;
-                case WangDirection.South: b = new LayoutCoord(a.X, a.Y + 1); break;
+                case WangEdgeDirection.East: b = new LayoutCoord(a.X + 1, a.Y); break;
+                case WangEdgeDirection.West: b = new LayoutCoord(a.X - 1, a.Y); break;
+                case WangEdgeDirection.North: b = new LayoutCoord(a.X, a.Y - 1); break;
+                case WangEdgeDirection.South: b = new LayoutCoord(a.X, a.Y + 1); break;
                 default:return null;
             }
              

@@ -9,7 +9,7 @@ using UnityEngine;
 using System;
 #endif
 
-namespace Lunar.Utils
+namespace WangTiles.Utils
 {
     public static class MathUtils
     {

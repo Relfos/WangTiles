@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using OpenTK.Graphics.OpenGL;
 using System.Drawing;
 
-namespace WangTiles
+namespace WangTiles.Utils
 {
     public class FontUtils
     {

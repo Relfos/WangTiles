@@ -3,7 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 14
 VisualStudioVersion = 14.0.25420.1
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WangTiles", "WangTiles\WangTiles.csproj", "{729FB5B7-138F-48DF-9BDE-7FA3E72BC373}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WangTilesDemo", "WangTiles\WangTilesDemo.csproj", "{729FB5B7-138F-48DF-9BDE-7FA3E72BC373}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WangTileLib", "WangTileLib\WangTileLib.csproj", "{F179FA9F-2E56-429E-9F1A-ABA91FA6C9CE}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DungeonGenDemo", "DungeonGenDemo\DungeonGenDemo.csproj", "{98659412-205D-456C-A8EB-D4E3608B8DEB}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TerrainGenDemo", "TerrainGenDemo\TerrainGenDemo.csproj", "{90B6F5E9-CF85-45E4-B8C6-D05313A4309A}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +21,18 @@ Global
 		{729FB5B7-138F-48DF-9BDE-7FA3E72BC373}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{729FB5B7-138F-48DF-9BDE-7FA3E72BC373}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{729FB5B7-138F-48DF-9BDE-7FA3E72BC373}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F179FA9F-2E56-429E-9F1A-ABA91FA6C9CE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F179FA9F-2E56-429E-9F1A-ABA91FA6C9CE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F179FA9F-2E56-429E-9F1A-ABA91FA6C9CE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F179FA9F-2E56-429E-9F1A-ABA91FA6C9CE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{98659412-205D-456C-A8EB-D4E3608B8DEB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{98659412-205D-456C-A8EB-D4E3608B8DEB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{98659412-205D-456C-A8EB-D4E3608B8DEB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{98659412-205D-456C-A8EB-D4E3608B8DEB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{90B6F5E9-CF85-45E4-B8C6-D05313A4309A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{90B6F5E9-CF85-45E4-B8C6-D05313A4309A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{90B6F5E9-CF85-45E4-B8C6-D05313A4309A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{90B6F5E9-CF85-45E4-B8C6-D05313A4309A}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -69,49 +69,54 @@ namespace WangTiles
                 Bitmap target = new Bitmap(512, 32);
                 for (int i = 0; i < 16; i++)
                 {
-                    var url = "http://s358455341.websitehome.co.uk/stagecast/art/edge/" + name + "/" + i + ".gif";
+                    var url = "http://cr31.co.uk/stagecast/art/corn/" + name + "/" + i + ".gif";
                     var tempName = "temp" + i + ".gif";
                     client.DownloadFile(url, tempName);
                     Bitmap temp = new Bitmap(tempName);
                     Graphics g = Graphics.FromImage(target);
                     g.DrawImage(temp, i * 32, 0);
                 }
-                target.Save("tileset.png");
+                target.Save(@"..\data\"+name+".png");
             }
         }
 
 
         public static void Main(string[] args)
         {
-            //DownloadTileset("walkway");
+            //DownloadTileset("glob");
 
             bool drawBorders = false;
-            int drawScale = 4;
+            int drawScale = 1;
 
-            var tilesets = new List<Tileset>();
-            // load tilesets
-            for (int i=0; i<=9; i++)
-            {
-                var tileset = new Tileset("../data/tileset"+i+".png");
-                tilesets.Add(tileset);
-            }
-
-
-            int exitX = 1;
-            int exitY = -1;
+            var tileset = new Tileset("../data/seasand.png");
 
             #region WANG_GENERATION
-            var map = new WangEdgeMap(14, 9, 3424);
-            map.AddExit(exitX, exitY);
+            var map = new WangCornerMap(18, 12, 1424);
+
+            // not everything needs to be random, we can pre-fill parts of the map with our own data
+            for (int j = 2; j <= 6; j++)
+            {
+                for (int i = 2; i <= 6; i++)
+                {
+                    map.SetTileIDAt(i, j, 0);
+                }
+            }
+
+            for (int j = 8; j <= 11; j++)
+            {
+                for (int i = 8; i <= 14; i++)
+                {
+                    map.SetTileIDAt(i, j, 15);
+                }
+            }
+
+            // now fill the missing tiles randomly
             map.Generate();
-            map.FixConnectivity();
+            map.Invert();
             #endregion
 
-
             // now render the map to a pixel array
-            int currentTileset = 0;
-            tilesets[currentTileset].RedrawWithTileset(buffer, bufferWidth, bufferHeight, map, drawBorders, drawScale);
-
+            tileset.RedrawWithTileset(buffer, bufferWidth, bufferHeight, map, drawBorders, drawScale);
 
             int bufferTexID = 0;
 
@@ -145,8 +150,8 @@ namespace WangTiles
 
                     //Console.WriteLine(mousePos.X + "    " + mousePos.Y);
 
-                    selX = (mousePos.X) / (drawScale * tilesets[currentTileset].TileSize);
-                    selY = (mousePos.Y) / (drawScale * tilesets[currentTileset].TileSize);
+                    selX = (mousePos.X) / (drawScale * tileset.TileSize);
+                    selY = (mousePos.Y) / (drawScale * tileset.TileSize);
 
                     if (selX >= map.Width) { selX = -1; }
                     if (selY >= map.Height) { selY = -1; }
@@ -163,52 +168,6 @@ namespace WangTiles
                         Environment.Exit(0);
                     }
 
-                    int oldTileset = currentTileset;
-                    if (game.Keyboard[Key.Number1])
-                    {
-                        currentTileset = 0;
-                    }
-                    if (game.Keyboard[Key.Number2])
-                    {
-                        currentTileset = 1;
-                    }
-                    if (game.Keyboard[Key.Number3])
-                    {
-                        currentTileset = 2;
-                    }
-                    if (game.Keyboard[Key.Number4])
-                    {
-                        currentTileset = 3;
-                    }
-                    if (game.Keyboard[Key.Number5])
-                    {
-                        currentTileset = 4;
-                    }
-                    if (game.Keyboard[Key.Number6])
-                    {
-                        currentTileset = 5;
-                    }
-
-                    if (game.Keyboard[Key.Number7])
-                    {
-                        currentTileset = 6;
-                    }
-
-                    if (game.Keyboard[Key.Number8])
-                    {
-                        currentTileset = 7;
-                    }
-
-                    if (game.Keyboard[Key.Number9])
-                    {
-                        currentTileset = 8;
-                    }
-
-                    if (oldTileset != currentTileset)
-                    {
-                        tilesets[currentTileset].RedrawWithTileset(buffer, bufferWidth, bufferHeight, map, drawBorders, drawScale);
-                        UpdateBuffer(buffer, bufferWidth, bufferHeight, bufferTexID);
-                    }
                 };
 
 
